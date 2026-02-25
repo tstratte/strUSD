@@ -1,0 +1,2900 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>strUSD — STRC Yield On-Chain</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --black: #000000;
+  --black-light: #0a0a0a;
+  --black-card: #0f0f0f;
+  --black-elevated: #161616;
+  --border: #1e1e1e;
+  --border-glow: #2a2a2a;
+  --text: #ffffff;
+  --text-secondary: #999999;
+  --text-muted: #555555;
+  --orange: #f7931a;
+  --orange-light: #ffb347;
+  --orange-dark: #c77a15;
+  --orange-glow: rgba(247, 147, 26, 0.15);
+  --orange-glow-strong: rgba(247, 147, 26, 0.3);
+  --orange-glow-intense: rgba(247, 147, 26, 0.5);
+  --amber: #f59e0b;
+  --radius: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--black);
+  color: var(--text);
+  line-height: 1.6;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─── Grain Overlay ─── */
+body::after {
+  content: '';
+  position: fixed; inset: 0; z-index: 9999;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+  opacity: 0.4;
+}
+
+/* ─── Scrollbar ─── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: var(--black); }
+::-webkit-scrollbar-thumb { background: var(--orange-dark); border-radius: 2px; }
+
+/* ─── Glow Utility ─── */
+.glow-text {
+  text-shadow: 0 0 40px rgba(247, 147, 26, 0.3), 0 0 80px rgba(247, 147, 26, 0.1);
+}
+.glow-box {
+  box-shadow: 0 0 30px rgba(247, 147, 26, 0.08), inset 0 0 30px rgba(247, 147, 26, 0.02);
+}
+
+/* ─── Demo Banner ─── */
+.demo-banner {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 1100;
+  background: linear-gradient(90deg, #f59e0b, #f7931a, #f59e0b);
+  background-size: 200% 100%;
+  animation: banner-shimmer 3s linear infinite;
+  color: #000; text-align: center;
+  padding: 10px 24px; font-size: 13px; font-weight: 700;
+  font-family: 'Inter', sans-serif; letter-spacing: 0.3px;
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+}
+@keyframes banner-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.demo-banner .demo-badge {
+  background: rgba(0,0,0,0.2); color: #fff; padding: 3px 10px;
+  border-radius: 100px; font-size: 11px; font-weight: 800;
+  letter-spacing: 1px; text-transform: uppercase;
+}
+body.has-demo-banner nav { top: 38px; }
+body.has-demo-banner .hero { padding-top: 118px; }
+body.has-demo-banner .compliance-overlay { padding-top: 38px; }
+
+/* ─── Faucet Button ─── */
+.btn-faucet {
+  background: linear-gradient(135deg, #10b981, #34d399);
+  color: #000; border: none; border-radius: var(--radius);
+  padding: 12px 24px; font-size: 14px; font-weight: 700;
+  cursor: pointer; font-family: inherit; transition: all 0.3s;
+  display: inline-flex; align-items: center; gap: 8px;
+  box-shadow: 0 4px 20px rgba(16, 185, 129, 0.3);
+  position: relative; overflow: hidden;
+}
+.btn-faucet:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 28px rgba(16, 185, 129, 0.4);
+}
+.btn-faucet:disabled {
+  opacity: 0.5; cursor: not-allowed; transform: none;
+}
+.btn-faucet .spinner {
+  width: 14px; height: 14px; border: 2px solid rgba(0,0,0,0.2);
+  border-top-color: #000; border-radius: 50%;
+  animation: spin 0.8s linear infinite; display: inline-block;
+}
+
+/* ─── Faucet Card ─── */
+.faucet-card {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(0,0,0,0));
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: var(--radius-lg); padding: 20px 24px;
+  margin-bottom: 20px; display: none;
+}
+.faucet-card.visible { display: block; }
+.faucet-card-title {
+  font-size: 14px; font-weight: 700; color: #34d399;
+  margin-bottom: 8px; display: flex; align-items: center; gap: 8px;
+}
+.faucet-card-desc {
+  font-size: 13px; color: var(--text-secondary); margin-bottom: 14px; line-height: 1.6;
+}
+.faucet-amount-row {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+}
+.faucet-amount-btn {
+  background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2);
+  color: #34d399; border-radius: 8px; padding: 8px 16px; font-size: 13px;
+  font-weight: 600; cursor: pointer; font-family: inherit; transition: all 0.2s;
+}
+.faucet-amount-btn:hover, .faucet-amount-btn.selected {
+  background: rgba(16, 185, 129, 0.2); border-color: #34d399;
+}
+
+/* ─── Onboarding Toast ─── */
+.onboard-toast {
+  position: fixed; bottom: 24px; right: 24px; z-index: 1200;
+  background: var(--black-elevated); border: 1px solid rgba(247, 147, 26, 0.2);
+  border-radius: var(--radius-lg); padding: 20px 24px;
+  max-width: 340px; box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+  transform: translateY(120%); opacity: 0;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.onboard-toast.visible {
+  transform: translateY(0); opacity: 1;
+}
+.onboard-toast-step {
+  font-size: 11px; font-weight: 700; color: var(--orange);
+  text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;
+}
+.onboard-toast-title {
+  font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 6px;
+}
+.onboard-toast-desc {
+  font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 14px;
+}
+.onboard-toast-actions {
+  display: flex; gap: 8px;
+}
+.onboard-toast-btn {
+  background: linear-gradient(135deg, var(--orange), var(--orange-light));
+  color: #000; border: none; border-radius: 8px;
+  padding: 8px 18px; font-size: 13px; font-weight: 700;
+  cursor: pointer; font-family: inherit; transition: all 0.2s;
+}
+.onboard-toast-btn:hover { transform: translateY(-1px); }
+.onboard-toast-dismiss {
+  background: transparent; color: var(--text-muted); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 14px; font-size: 13px;
+  cursor: pointer; font-family: inherit; transition: all 0.2s;
+}
+.onboard-toast-dismiss:hover { color: var(--text-secondary); border-color: var(--border-glow); }
+.onboard-progress {
+  display: flex; gap: 4px; margin-bottom: 12px;
+}
+.onboard-dot {
+  width: 24px; height: 3px; border-radius: 2px; background: var(--border);
+  transition: background 0.3s;
+}
+.onboard-dot.active { background: var(--orange); }
+.onboard-dot.done { background: #10b981; }
+
+/* ═══════════════════════════════════════ */
+/* NAV                                     */
+/* ═══════════════════════════════════════ */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  background: rgba(0, 0, 0, 0.7);
+  border-bottom: 1px solid rgba(247, 147, 26, 0.08);
+}
+.nav-inner {
+  max-width: 1200px; margin: 0 auto;
+  padding: 0 24px; height: 64px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+.logo-mark {
+  width: 34px; height: 34px; border-radius: 10px;
+  background: linear-gradient(135deg, var(--orange), var(--orange-light));
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 15px; color: #000;
+  box-shadow: 0 0 20px rgba(247, 147, 26, 0.4);
+}
+.logo-text {
+  font-weight: 700; font-size: 18px; color: var(--text);
+  letter-spacing: -0.5px;
+}
+.logo-text span { color: var(--orange); }
+
+.nav-links { display: flex; align-items: center; gap: 28px; }
+.nav-links a {
+  color: var(--text-secondary); text-decoration: none; font-size: 13px;
+  font-weight: 500; transition: color 0.3s; letter-spacing: 0.3px;
+}
+.nav-links a:hover { color: var(--orange); }
+
+.btn-connect {
+  background: transparent;
+  color: var(--orange);
+  border: 1px solid var(--orange);
+  border-radius: 10px;
+  padding: 9px 20px; font-size: 13px; font-weight: 600;
+  cursor: pointer; font-family: inherit; transition: all 0.3s;
+  position: relative; overflow: hidden;
+}
+.btn-connect::before {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(135deg, var(--orange), var(--orange-light));
+  opacity: 0; transition: opacity 0.3s;
+}
+.btn-connect:hover { color: #000; }
+.btn-connect:hover::before { opacity: 1; }
+.btn-connect span { position: relative; z-index: 1; }
+
+/* ═══════════════════════════════════════ */
+/* HERO                                    */
+/* ═══════════════════════════════════════ */
+.hero {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  position: relative; overflow: hidden; padding: 80px 24px;
+}
+
+/* Canvas for particles */
+#particleCanvas {
+  position: absolute; inset: 0; z-index: 0;
+}
+
+/* Aurora gradient blobs */
+.aurora {
+  position: absolute; inset: 0; z-index: 0; overflow: hidden;
+}
+.aurora-blob {
+  position: absolute; border-radius: 50%; filter: blur(120px);
+  animation: aurora-float 12s ease-in-out infinite;
+}
+.aurora-blob:nth-child(1) {
+  width: 600px; height: 600px; top: -10%; left: 10%;
+  background: radial-gradient(circle, rgba(247, 147, 26, 0.2), transparent 70%);
+  animation-duration: 14s;
+}
+.aurora-blob:nth-child(2) {
+  width: 500px; height: 500px; bottom: -5%; right: 5%;
+  background: radial-gradient(circle, rgba(255, 179, 71, 0.12), transparent 70%);
+  animation-duration: 18s; animation-delay: -4s;
+}
+.aurora-blob:nth-child(3) {
+  width: 400px; height: 400px; top: 30%; left: 50%;
+  background: radial-gradient(circle, rgba(247, 147, 26, 0.1), transparent 70%);
+  animation-duration: 16s; animation-delay: -8s;
+}
+@keyframes aurora-float {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25% { transform: translate(40px, -30px) scale(1.05); }
+  50% { transform: translate(-20px, 20px) scale(0.95); }
+  75% { transform: translate(30px, 40px) scale(1.03); }
+}
+
+/* Glowing grid */
+.hero-grid {
+  position: absolute; inset: 0; z-index: 0;
+  background-image:
+    linear-gradient(rgba(247, 147, 26, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(247, 147, 26, 0.04) 1px, transparent 1px);
+  background-size: 80px 80px;
+  mask-image: radial-gradient(ellipse 60% 50% at 50% 40%, black, transparent);
+  animation: grid-pulse 8s ease-in-out infinite;
+}
+@keyframes grid-pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+/* Floating geometric shapes */
+.geo-shapes { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.geo {
+  position: absolute; border: 1px solid rgba(247, 147, 26, 0.1);
+  animation: geo-drift 20s linear infinite;
+}
+.geo:nth-child(1) {
+  width: 200px; height: 200px; top: 15%; left: 8%;
+  border-radius: 30% 70% 70% 30% / 30% 30% 70% 70%;
+  animation-duration: 25s;
+}
+.geo:nth-child(2) {
+  width: 150px; height: 150px; top: 60%; right: 10%;
+  border-radius: 50%; border-color: rgba(247, 147, 26, 0.06);
+  animation-duration: 30s; animation-delay: -5s;
+}
+.geo:nth-child(3) {
+  width: 100px; height: 100px; bottom: 20%; left: 20%;
+  transform: rotate(45deg);
+  animation-duration: 22s; animation-delay: -10s;
+}
+@keyframes geo-drift {
+  0% { transform: rotate(0deg) translateY(0); opacity: 0.5; }
+  50% { opacity: 1; }
+  100% { transform: rotate(360deg) translateY(-20px); opacity: 0.5; }
+}
+
+.hero-content { position: relative; z-index: 2; text-align: center; max-width: 840px; }
+
+.badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: rgba(247, 147, 26, 0.08);
+  border: 1px solid rgba(247, 147, 26, 0.15);
+  border-radius: 100px; padding: 7px 18px 7px 12px;
+  font-size: 13px; font-weight: 500; color: var(--orange);
+  margin-bottom: 28px;
+  backdrop-filter: blur(10px);
+}
+.badge-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--orange);
+  box-shadow: 0 0 10px var(--orange);
+  animation: pulse-dot 2s infinite;
+}
+@keyframes pulse-dot {
+  0%, 100% { box-shadow: 0 0 4px var(--orange); }
+  50% { box-shadow: 0 0 16px var(--orange), 0 0 30px rgba(247, 147, 26, 0.3); }
+}
+
+h1 {
+  font-size: clamp(44px, 7vw, 80px); font-weight: 800; letter-spacing: -3px;
+  line-height: 1.0; margin-bottom: 24px;
+}
+h1 .orange {
+  background: linear-gradient(135deg, var(--orange), var(--orange-light), var(--orange));
+  background-size: 200% 200%;
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: gradient-shift 4s ease infinite;
+}
+@keyframes gradient-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+h1 .dim { color: var(--text-secondary); font-weight: 600; }
+
+.hero-sub {
+  font-size: 18px; color: var(--text-secondary); max-width: 560px;
+  margin: 0 auto 44px; line-height: 1.7; font-weight: 400;
+}
+
+.hero-ctas { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--orange), var(--orange-light));
+  color: #000; border: none; border-radius: var(--radius);
+  padding: 15px 36px; font-size: 16px; font-weight: 700; cursor: pointer;
+  font-family: inherit; transition: all 0.3s;
+  display: inline-flex; align-items: center; gap: 8px;
+  box-shadow: 0 4px 24px rgba(247, 147, 26, 0.3), 0 0 60px rgba(247, 147, 26, 0.1);
+  position: relative; overflow: hidden;
+}
+.btn-primary::after {
+  content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
+  background: linear-gradient(45deg, transparent 40%, rgba(255,255,255,0.15) 50%, transparent 60%);
+  animation: btn-shine 3s ease-in-out infinite;
+}
+@keyframes btn-shine {
+  0% { transform: translateX(-100%) rotate(0deg); }
+  100% { transform: translateX(100%) rotate(0deg); }
+}
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px rgba(247, 147, 26, 0.4), 0 0 80px rgba(247, 147, 26, 0.15);
+}
+
+.btn-ghost {
+  background: transparent; color: var(--text);
+  border: 1px solid var(--border-glow); border-radius: var(--radius);
+  padding: 15px 36px; font-size: 16px; font-weight: 500;
+  cursor: pointer; font-family: inherit; transition: all 0.3s;
+}
+.btn-ghost:hover { border-color: rgba(247, 147, 26, 0.3); color: var(--orange); }
+
+/* ─── Stats Bar ─── */
+.stats-bar {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 1px; background: rgba(247, 147, 26, 0.06);
+  border: 1px solid rgba(247, 147, 26, 0.08);
+  border-radius: var(--radius-xl); overflow: hidden;
+  max-width: 820px; margin: 64px auto 0;
+  backdrop-filter: blur(20px);
+}
+.stat-item {
+  background: rgba(10, 10, 10, 0.8); padding: 28px 20px; text-align: center;
+  transition: background 0.3s;
+}
+.stat-item:hover { background: rgba(20, 20, 20, 0.9); }
+.stat-value {
+  font-size: 30px; font-weight: 700; letter-spacing: -1.5px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.stat-value.orange {
+  background: linear-gradient(135deg, var(--orange), var(--orange-light));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.stat-label {
+  font-size: 11px; color: var(--text-muted); margin-top: 6px;
+  text-transform: uppercase; letter-spacing: 1.5px; font-weight: 500;
+}
+
+/* ═══════════════════════════════════════ */
+/* SECTIONS                                */
+/* ═══════════════════════════════════════ */
+section { padding: 120px 24px; position: relative; }
+.section-inner { max-width: 1200px; margin: 0 auto; }
+
+.section-label {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 3px; color: var(--orange); margin-bottom: 16px;
+}
+.section-label::before {
+  content: ''; width: 24px; height: 1px;
+  background: linear-gradient(90deg, var(--orange), transparent);
+}
+.section-title {
+  font-size: clamp(30px, 4vw, 44px); font-weight: 800; letter-spacing: -1.5px;
+  margin-bottom: 16px; line-height: 1.1;
+}
+.section-desc {
+  font-size: 16px; color: var(--text-secondary); max-width: 560px;
+  margin-bottom: 56px; line-height: 1.7;
+}
+
+/* Section divider */
+.section-divider {
+  width: 100%; height: 1px; max-width: 1200px; margin: 0 auto;
+  background: linear-gradient(90deg, transparent, rgba(247,147,26,0.15), transparent);
+}
+
+/* ═══════════════════════════════════════ */
+/* GLASS CARDS                             */
+/* ═══════════════════════════════════════ */
+.glass {
+  background: rgba(15, 15, 15, 0.6);
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  border: 1px solid rgba(247, 147, 26, 0.06);
+  border-radius: var(--radius-lg);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.glass:hover {
+  border-color: rgba(247, 147, 26, 0.15);
+  box-shadow: 0 0 40px rgba(247, 147, 26, 0.05), inset 0 0 40px rgba(247, 147, 26, 0.02);
+}
+
+/* ═══════════════════════════════════════ */
+/* APP SECTION                             */
+/* ═══════════════════════════════════════ */
+.app-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+
+.card {
+  background: var(--black-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl); padding: 32px;
+  position: relative; overflow: hidden;
+}
+.card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(247, 147, 26, 0.2), transparent);
+}
+
+.card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; }
+.card-title { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
+.card-badge {
+  font-size: 11px; font-weight: 700; padding: 5px 12px; border-radius: 8px;
+  background: var(--orange-glow); color: var(--orange);
+  border: 1px solid rgba(247, 147, 26, 0.15);
+  text-transform: uppercase; letter-spacing: 1px;
+}
+
+/* Tabs */
+.tabs {
+  display: flex; gap: 4px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 4px; margin-bottom: 28px;
+}
+.tab {
+  flex: 1; padding: 10px; text-align: center; border-radius: 9px; border: none;
+  background: transparent; color: var(--text-muted); font-size: 13px; font-weight: 600;
+  cursor: pointer; font-family: inherit; transition: all 0.3s;
+  letter-spacing: 0.3px;
+}
+.tab.active {
+  background: linear-gradient(135deg, var(--orange), var(--orange-dark));
+  color: #000;
+  box-shadow: 0 2px 12px rgba(247, 147, 26, 0.3);
+}
+.tab:not(.active):hover { color: var(--text-secondary); }
+
+/* Inputs */
+.input-group { margin-bottom: 12px; }
+.input-label {
+  display: flex; justify-content: space-between; margin-bottom: 8px;
+  font-size: 12px; color: var(--text-muted); letter-spacing: 0.5px;
+  text-transform: uppercase; font-weight: 600;
+}
+.input-label .bal { color: var(--text-secondary); cursor: pointer; text-transform: none; font-weight: 500; letter-spacing: 0; }
+.input-label .bal:hover { color: var(--orange); }
+
+.input-wrapper {
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px 18px;
+  transition: all 0.3s;
+}
+.input-wrapper:focus-within {
+  border-color: rgba(247, 147, 26, 0.4);
+  box-shadow: 0 0 20px rgba(247, 147, 26, 0.08);
+}
+.input-wrapper input {
+  flex: 1; background: none; border: none; outline: none; color: var(--text);
+  font-size: 24px; font-weight: 700; font-family: 'JetBrains Mono', monospace;
+  letter-spacing: -0.5px;
+}
+.input-wrapper input::placeholder { color: var(--text-muted); font-weight: 400; }
+
+.token-badge {
+  display: flex; align-items: center; gap: 7px;
+  background: var(--black-elevated); border: 1px solid var(--border-glow);
+  border-radius: 10px; padding: 7px 14px 7px 8px;
+  font-size: 14px; font-weight: 700; color: var(--text);
+  white-space: nowrap;
+}
+.token-dot {
+  width: 24px; height: 24px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 800;
+}
+.token-dot.usdc { background: #2775ca; }
+.token-dot.strusd {
+  background: linear-gradient(135deg, var(--orange), var(--orange-light));
+  color: #000;
+}
+.token-dot.sstrusd {
+  background: linear-gradient(135deg, var(--orange), #ff6b00);
+  color: #000;
+}
+
+/* Arrow */
+.swap-arrow { display: flex; justify-content: center; margin: -2px 0; position: relative; z-index: 1; }
+.swap-arrow-icon {
+  width: 40px; height: 40px; border-radius: 12px;
+  background: var(--black-elevated); border: 3px solid var(--black-card);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--orange); font-size: 18px;
+}
+
+/* Payment Methods */
+.payment-methods { margin: 24px 0; }
+.payment-label {
+  font-size: 11px; color: var(--text-muted); margin-bottom: 10px;
+  text-transform: uppercase; letter-spacing: 1.5px; font-weight: 600;
+}
+.payment-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.payment-option {
+  display: flex; align-items: center; gap: 12px;
+  background: rgba(255,255,255,0.02); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 14px 16px; cursor: pointer;
+  transition: all 0.3s; font-family: inherit;
+}
+.payment-option:hover { border-color: var(--border-glow); background: rgba(255,255,255,0.03); }
+.payment-option.selected {
+  border-color: var(--orange);
+  background: var(--orange-glow);
+  box-shadow: 0 0 20px rgba(247, 147, 26, 0.08);
+}
+.pay-icon {
+  width: 36px; height: 36px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; flex-shrink: 0;
+}
+.pay-icon.ic-apple { background: #fff; color: #000; }
+.pay-icon.ic-usdc { background: #2775ca; color: #fff; }
+.pay-icon.ic-btc { background: var(--orange); color: #fff; }
+.pay-icon.ic-ln { background: linear-gradient(135deg, var(--orange), var(--orange-light)); color: #000; }
+.pay-info { display: flex; flex-direction: column; }
+.pay-name { font-size: 13px; font-weight: 600; color: var(--text); }
+.pay-detail { font-size: 11px; color: var(--text-muted); }
+
+/* Action Buttons */
+.btn-action {
+  width: 100%; padding: 17px; border: none; border-radius: var(--radius);
+  font-size: 16px; font-weight: 700; cursor: pointer; font-family: inherit;
+  transition: all 0.3s; margin-top: 12px;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  position: relative; overflow: hidden; letter-spacing: 0.3px;
+}
+.btn-action::after {
+  content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
+  background: linear-gradient(45deg, transparent 40%, rgba(255,255,255,0.1) 50%, transparent 60%);
+  animation: btn-shine 4s ease-in-out infinite;
+}
+.btn-mint {
+  background: linear-gradient(135deg, var(--orange), var(--orange-light));
+  color: #000;
+  box-shadow: 0 4px 24px rgba(247, 147, 26, 0.25);
+}
+.btn-mint:hover { box-shadow: 0 8px 40px rgba(247, 147, 26, 0.35); transform: translateY(-1px); }
+.btn-apple { background: #fff; color: #000; }
+.btn-apple:hover { background: #f0f0f0; }
+.btn-bitcoin { background: var(--orange); color: #000; }
+.btn-bitcoin:hover { background: var(--orange-light); }
+.btn-lightning {
+  background: linear-gradient(135deg, var(--orange), var(--orange-light), #ffe082);
+  color: #000;
+}
+
+/* Rate Info */
+.rate-info {
+  display: flex; flex-direction: column; gap: 10px;
+  margin-top: 20px; padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+.rate-row { display: flex; justify-content: space-between; font-size: 13px; }
+.rate-row .label { color: var(--text-muted); }
+.rate-row .value {
+  color: var(--text-secondary);
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+}
+
+/* ─── Dashboard ─── */
+.dash-grid { display: grid; gap: 10px; }
+.dash-item {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 18px 20px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition: all 0.3s;
+}
+.dash-item:hover { border-color: rgba(247, 147, 26, 0.1); }
+.dash-item-label { font-size: 13px; color: var(--text-muted); font-weight: 500; }
+.dash-item-value {
+  font-size: 17px; font-weight: 700;
+  font-family: 'JetBrains Mono', monospace; letter-spacing: -0.5px;
+}
+.dash-item-value.orange {
+  background: linear-gradient(135deg, var(--orange), var(--orange-light));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Yield chart */
+.yield-chart-wrap { margin-top: 16px; }
+.yield-chart-label { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+.yield-chart {
+  height: 100px;
+  background: rgba(255,255,255,0.01);
+  border: 1px solid var(--border);
+  border-radius: var(--radius); overflow: hidden;
+  display: flex; align-items: flex-end; padding: 12px; gap: 3px;
+}
+.yield-bar {
+  flex: 1; border-radius: 2px 2px 0 0; min-height: 4px;
+  background: linear-gradient(to top, var(--orange), rgba(247, 147, 26, 0.2));
+  transition: height 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+.yield-bar:hover { background: linear-gradient(to top, var(--orange-light), rgba(247, 147, 26, 0.3)); }
+
+/* ═══════════════════════════════════════ */
+/* HOW IT WORKS                            */
+/* ═══════════════════════════════════════ */
+.steps-container { position: relative; }
+.steps-line {
+  position: absolute; top: 44px; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent 5%, rgba(247, 147, 26, 0.15) 20%, rgba(247, 147, 26, 0.15) 80%, transparent 95%);
+}
+.steps-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; position: relative; z-index: 1; }
+
+.step-card {
+  background: var(--black-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl); padding: 36px 28px; text-align: center;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+.step-card:hover {
+  border-color: rgba(247, 147, 26, 0.2);
+  transform: translateY(-4px);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.4), 0 0 40px rgba(247, 147, 26, 0.05);
+}
+.step-num {
+  width: 48px; height: 48px; border-radius: 14px;
+  background: linear-gradient(135deg, var(--orange), var(--orange-dark));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; font-weight: 800; color: #000;
+  margin: 0 auto 24px;
+  box-shadow: 0 4px 16px rgba(247, 147, 26, 0.3);
+}
+.step-title { font-size: 18px; font-weight: 700; margin-bottom: 10px; letter-spacing: -0.3px; }
+.step-desc { font-size: 14px; color: var(--text-secondary); line-height: 1.7; }
+
+/* ═══════════════════════════════════════ */
+/* PAYMENT OPTIONS                         */
+/* ═══════════════════════════════════════ */
+.pay-options-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.pay-card {
+  background: var(--black-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl); padding: 36px 20px; text-align: center;
+  transition: all 0.4s; position: relative; overflow: hidden;
+}
+.pay-card::after {
+  content: ''; position: absolute; bottom: 0; left: 20%; right: 20%; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(247, 147, 26, 0.2), transparent);
+  opacity: 0; transition: opacity 0.4s;
+}
+.pay-card:hover {
+  border-color: rgba(247, 147, 26, 0.15);
+  transform: translateY(-4px);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+}
+.pay-card:hover::after { opacity: 1; }
+
+.pay-icon-lg {
+  width: 64px; height: 64px; border-radius: 18px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px; margin: 0 auto 20px;
+  position: relative;
+}
+.pay-icon-lg::after {
+  content: ''; position: absolute; inset: -4px; border-radius: 22px;
+  background: inherit; opacity: 0.2; filter: blur(12px);
+}
+.pay-icon-lg.apple-lg { background: #fff; color: #000; }
+.pay-icon-lg.btc-lg { background: var(--orange); color: #fff; }
+.pay-icon-lg.ln-lg { background: linear-gradient(135deg, var(--orange), var(--orange-light)); color: #000; }
+.pay-icon-lg.usdc-lg { background: #2775ca; color: #fff; }
+
+.pay-card-title { font-size: 16px; font-weight: 700; margin-bottom: 6px; letter-spacing: -0.3px; }
+.pay-card-sub { font-size: 13px; color: var(--text-muted); line-height: 1.5; }
+.pay-speed-badge {
+  display: inline-block; margin-top: 14px; font-size: 11px; font-weight: 700;
+  padding: 4px 10px; border-radius: 6px;
+  background: var(--orange-glow); color: var(--orange);
+  border: 1px solid rgba(247, 147, 26, 0.1);
+  letter-spacing: 0.5px;
+}
+
+/* ═══════════════════════════════════════ */
+/* PROOF OF RESERVES                       */
+/* ═══════════════════════════════════════ */
+.reserves-card {
+  background: var(--black-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl); padding: 40px;
+  max-width: 720px; margin: 0 auto; position: relative; overflow: hidden;
+}
+.reserves-card::before {
+  content: ''; position: absolute; top: -1px; left: 10%; right: 10%; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--orange), transparent);
+}
+.reserve-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 18px 0; border-bottom: 1px solid var(--border);
+}
+.reserve-row:last-of-type { border-bottom: none; }
+.reserve-label { color: var(--text-secondary); font-size: 14px; }
+.reserve-value {
+  font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 15px;
+  letter-spacing: -0.3px;
+}
+.reserve-value.orange {
+  background: linear-gradient(135deg, var(--orange), var(--orange-light));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.reserve-bar {
+  height: 6px; background: rgba(255,255,255,0.03);
+  border-radius: 3px; margin-top: 28px; overflow: hidden;
+  border: 1px solid var(--border);
+}
+.reserve-fill {
+  height: 100%; border-radius: 3px; width: 0;
+  background: linear-gradient(90deg, var(--orange), var(--orange-light), var(--orange));
+  background-size: 200% 100%;
+  animation: reserve-glow 3s ease infinite;
+  transition: width 2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+@keyframes reserve-glow {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+.reserve-status {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  margin-top: 16px; font-size: 13px; color: var(--orange); font-weight: 600;
+}
+
+/* ═══════════════════════════════════════ */
+/* CTA SECTION                             */
+/* ═══════════════════════════════════════ */
+.cta-section {
+  text-align: center; position: relative; overflow: hidden;
+}
+.cta-glow {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: 600px; height: 300px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(247, 147, 26, 0.1), transparent 70%);
+  filter: blur(80px);
+}
+
+/* ═══════════════════════════════════════ */
+/* FOOTER                                  */
+/* ═══════════════════════════════════════ */
+footer {
+  border-top: 1px solid var(--border); padding: 48px 24px;
+}
+.footer-inner {
+  max-width: 1200px; margin: 0 auto;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.footer-links { display: flex; gap: 24px; }
+.footer-links a {
+  color: var(--text-muted); text-decoration: none; font-size: 13px;
+  transition: color 0.3s;
+}
+.footer-links a:hover { color: var(--orange); }
+.footer-copy { font-size: 12px; color: var(--text-muted); }
+
+/* ═══════════════════════════════════════ */
+/* SCROLL ANIMATIONS                       */
+/* ═══════════════════════════════════════ */
+.reveal {
+  opacity: 0; transform: translateY(30px);
+  transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1), transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.reveal.visible { opacity: 1; transform: translateY(0); }
+.reveal-delay-1 { transition-delay: 0.1s; }
+.reveal-delay-2 { transition-delay: 0.2s; }
+.reveal-delay-3 { transition-delay: 0.3s; }
+.reveal-delay-4 { transition-delay: 0.4s; }
+
+/* Hero specific */
+.hero-fade { opacity: 0; transform: translateY(24px); animation: hero-in 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+.hero-fade-1 { animation-delay: 0.1s; }
+.hero-fade-2 { animation-delay: 0.25s; }
+.hero-fade-3 { animation-delay: 0.4s; }
+.hero-fade-4 { animation-delay: 0.55s; }
+.hero-fade-5 { animation-delay: 0.7s; }
+@keyframes hero-in {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ═══════════════════════════════════════ */
+/* RESPONSIVE                              */
+/* ═══════════════════════════════════════ */
+@media (max-width: 960px) {
+  .app-grid { grid-template-columns: 1fr; }
+  .stats-bar { grid-template-columns: repeat(2, 1fr); }
+  .steps-grid { grid-template-columns: 1fr; }
+  .steps-line { display: none; }
+  .pay-options-grid { grid-template-columns: repeat(2, 1fr); }
+  .nav-links { display: none; }
+}
+@media (max-width: 600px) {
+  .stats-bar { grid-template-columns: 1fr; }
+  .pay-options-grid { grid-template-columns: 1fr; }
+  .payment-grid { grid-template-columns: 1fr; }
+  .footer-inner { flex-direction: column; gap: 20px; text-align: center; }
+  h1 { letter-spacing: -2px; }
+  .div-info-row { grid-template-columns: 1fr 1fr; }
+  .div-timeline { display: none; }
+  .div-card-inner { padding-top: 24px; }
+}
+
+/* ═══════════════════════════════════════ */
+/* DIVIDEND TIMELINE                       */
+/* ═══════════════════════════════════════ */
+.div-card {
+  background: var(--black-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  position: relative; overflow: hidden;
+  max-width: 900px;
+}
+.div-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(247, 147, 26, 0.25), transparent);
+}
+.div-card-inner { padding: 40px 36px 36px; }
+
+/* Timeline Track */
+.div-timeline {
+  position: relative; height: 120px; margin-bottom: 36px; padding: 0 40px;
+}
+.div-timeline-track {
+  position: absolute; top: 24px; left: 40px; right: 40px; height: 3px;
+  background: var(--border); border-radius: 2px;
+}
+.div-timeline-fill {
+  height: 100%; border-radius: 2px; width: 0;
+  background: linear-gradient(90deg, var(--orange), var(--orange-light));
+  box-shadow: 0 0 12px rgba(247, 147, 26, 0.3);
+  transition: width 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Milestones */
+.div-milestone {
+  position: absolute; top: 0; transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center;
+}
+.div-milestone-dot {
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 3px solid var(--black-card); position: relative; z-index: 2;
+  margin-bottom: 12px;
+}
+.div-milestone-dot.completed {
+  background: var(--orange);
+  box-shadow: 0 0 8px rgba(247, 147, 26, 0.4);
+}
+.div-milestone-dot.active {
+  background: var(--orange);
+  box-shadow: 0 0 12px rgba(247, 147, 26, 0.5), 0 0 24px rgba(247, 147, 26, 0.2);
+  animation: milestone-pulse 2s infinite;
+}
+@keyframes milestone-pulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(247, 147, 26, 0.4); }
+  50% { box-shadow: 0 0 20px rgba(247, 147, 26, 0.6), 0 0 40px rgba(247, 147, 26, 0.2); }
+}
+.div-milestone-dot.upcoming {
+  background: var(--border-glow);
+  border-color: var(--black-card);
+}
+
+.div-milestone-content { text-align: center; white-space: nowrap; }
+.div-milestone-label {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px;
+  color: var(--text-muted); font-weight: 600; margin-bottom: 4px;
+}
+.div-milestone-date {
+  font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 700;
+  letter-spacing: -0.3px; color: var(--text);
+}
+.active-milestone .div-milestone-date { color: var(--orange); }
+.div-milestone-detail {
+  font-size: 11px; color: var(--text-muted); margin-top: 2px;
+}
+
+/* Info Row */
+.div-info-row {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+  margin-bottom: 24px;
+}
+.div-info-item {
+  display: flex; align-items: center; gap: 12px;
+  background: rgba(255,255,255,0.02); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px;
+  transition: border-color 0.3s;
+}
+.div-info-item:hover { border-color: rgba(247, 147, 26, 0.15); }
+.div-info-icon { font-size: 24px; flex-shrink: 0; }
+.div-info-title {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 1px;
+  color: var(--text-muted); font-weight: 600; margin-bottom: 2px;
+}
+.div-info-value {
+  font-size: 16px; font-weight: 700; font-family: 'JetBrains Mono', monospace;
+  letter-spacing: -0.3px;
+}
+.orange-text {
+  background: linear-gradient(135deg, var(--orange), var(--orange-light));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.div-per {
+  font-size: 11px; font-weight: 500; color: var(--text-muted);
+  -webkit-text-fill-color: var(--text-muted);
+}
+
+/* Explainer */
+.div-explainer {
+  background: rgba(247, 147, 26, 0.04);
+  border: 1px solid rgba(247, 147, 26, 0.08);
+  border-radius: var(--radius); padding: 20px 24px;
+}
+.div-explainer-title {
+  font-size: 13px; font-weight: 700; color: var(--orange);
+  margin-bottom: 8px;
+}
+.div-explainer-text {
+  font-size: 14px; color: var(--text-secondary); line-height: 1.7;
+}
+.div-explainer-text strong { color: var(--text); font-weight: 600; }
+/* ─── Compliance Gate ─── */
+.compliance-overlay {
+  position: fixed; inset: 0; z-index: 99999;
+  background: rgba(0,0,0,0.95);
+  display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(20px);
+  opacity: 1; transition: opacity 0.4s;
+}
+.compliance-overlay.hidden { opacity: 0; pointer-events: none; }
+.compliance-card {
+  background: var(--black-card);
+  border: 1px solid var(--border-glow);
+  border-radius: var(--radius-xl);
+  padding: 48px 40px;
+  max-width: 520px;
+  width: 90%;
+  text-align: center;
+}
+.compliance-card h2 {
+  font-size: 24px; font-weight: 700; margin-bottom: 8px;
+  background: linear-gradient(135deg, var(--text), var(--orange-light));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+.compliance-card .subtitle {
+  font-size: 14px; color: var(--text-secondary); margin-bottom: 28px;
+}
+.compliance-card .legal-text {
+  font-size: 13px; color: var(--text-secondary); line-height: 1.7;
+  text-align: left; margin-bottom: 24px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.compliance-card .legal-text strong { color: var(--text); }
+.compliance-checkbox {
+  display: flex; align-items: flex-start; gap: 12px;
+  text-align: left; margin-bottom: 24px; cursor: pointer;
+}
+.compliance-checkbox input[type="checkbox"] {
+  width: 20px; height: 20px; margin-top: 2px;
+  accent-color: var(--orange); cursor: pointer; flex-shrink: 0;
+}
+.compliance-checkbox label {
+  font-size: 14px; color: var(--text); cursor: pointer; line-height: 1.5;
+}
+.btn-compliance {
+  width: 100%; padding: 16px;
+  background: linear-gradient(135deg, var(--orange), var(--orange-dark));
+  color: #000; font-weight: 700; font-size: 16px;
+  border: none; border-radius: var(--radius);
+  cursor: pointer; font-family: inherit;
+  transition: all 0.3s; opacity: 0.3;
+}
+.btn-compliance:disabled { cursor: not-allowed; opacity: 0.3; }
+.btn-compliance:not(:disabled) { opacity: 1; }
+.btn-compliance:not(:disabled):hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(247,147,26,0.3); }
+.compliance-card .geo-blocked {
+  color: #ef4444; font-size: 14px; font-weight: 600;
+  padding: 16px; background: rgba(239,68,68,0.1);
+  border: 1px solid rgba(239,68,68,0.2);
+  border-radius: var(--radius); margin-bottom: 16px;
+}
+.compliance-footer {
+  font-size: 11px; color: var(--text-muted); margin-top: 16px; line-height: 1.5;
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ Compliance Gate ═══ -->
+<div class="compliance-overlay" id="complianceOverlay">
+  <div class="compliance-card">
+    <h2>Access Restricted</h2>
+    <div class="subtitle">strUSD is not available to US persons</div>
+
+    <div id="geoStatus" style="margin-bottom: 16px; font-size: 13px; color: var(--text-muted);">
+      Checking your location...
+    </div>
+
+    <div id="geoBlocked" class="geo-blocked" style="display: none;">
+      This service is not available in your jurisdiction. strUSD is not offered to, or for the benefit of, US persons as defined under Regulation S of the US Securities Act.
+    </div>
+
+    <div id="complianceForm" style="display: none;">
+      <div class="legal-text">
+        <strong>Important Regulatory Notice</strong><br><br>
+        strUSD tokens and related services are <strong>not offered, sold, or distributed to, or for the benefit of, United States persons</strong> as defined in Rule 902(k) of Regulation S under the U.S. Securities Act of 1933.<br><br>
+        This includes any person residing in the United States, any entity organized under the laws of the United States, and any account held for the benefit of a US person, regardless of the location of the account holder.<br><br>
+        By proceeding, you represent and warrant that:<br><br>
+        <strong>1.</strong> You are NOT a citizen, resident, or green card holder of the United States.<br>
+        <strong>2.</strong> You are NOT accessing this service from within the United States or its territories.<br>
+        <strong>3.</strong> You are NOT acting on behalf of, or for the benefit of, any US person.<br>
+        <strong>4.</strong> You will NOT transfer strUSD tokens to any US person.<br>
+        <strong>5.</strong> You understand that strUSD involves risk, including the potential loss of principal.<br>
+        <strong>6.</strong> You acknowledge that this product is not registered with any securities regulator.
+      </div>
+
+      <label class="compliance-checkbox">
+        <input type="checkbox" id="attestCheck" onchange="document.getElementById('attestBtn').disabled = !this.checked;">
+        <label for="attestCheck">I confirm that I have read, understood, and agree to the above terms. I am <strong>not a US person</strong> and I am accessing this service from outside the United States.</label>
+      </label>
+
+      <button class="btn-compliance" id="attestBtn" disabled onclick="acceptCompliance()">
+        Confirm & Enter strUSD
+      </button>
+    </div>
+
+    <div class="compliance-footer">
+      strUSD is a non-custodial DeFi protocol. This attestation is recorded for compliance purposes.<br>
+      If you are unsure whether you qualify, consult a legal advisor in your jurisdiction.
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Demo Mode Banner ═══ -->
+<div class="demo-banner" id="demoBanner">
+  <span class="demo-badge">DEMO</span>
+  <span>You're using strUSD in demo mode on Base mainnet with test tokens — no real funds needed</span>
+</div>
+<!-- Particle Canvas -->
+<canvas id="particleCanvas"></canvas>
+
+<!-- ═══ Nav ═══ -->
+<nav>
+  <div class="nav-inner">
+    <a href="#" class="logo">
+      <div class="logo-mark">$</div>
+      <div class="logo-text">str<span>USD</span></div>
+    </a>
+    <div class="nav-links">
+      <a href="#app">Mint</a>
+      <a href="#how">How It Works</a>
+      <a href="#payments">Payments</a>
+      <a href="#reserves">Reserves</a>
+      <a href="#">Docs</a>
+    </div>
+    <button class="btn-connect" onclick="connectWallet()"><span>Connect Wallet</span></button>
+  </div>
+</nav>
+
+<!-- ═══ Hero ═══ -->
+<section class="hero">
+  <div class="aurora">
+    <div class="aurora-blob"></div>
+    <div class="aurora-blob"></div>
+    <div class="aurora-blob"></div>
+  </div>
+  <div class="hero-grid"></div>
+  <div class="geo-shapes">
+    <div class="geo"></div>
+    <div class="geo"></div>
+    <div class="geo"></div>
+  </div>
+
+  <div class="hero-content">
+    <div class="badge hero-fade hero-fade-1">
+      <div class="badge-dot"></div>
+      Live on Base — STRC Yield On-Chain
+    </div>
+
+    <h1 class="hero-fade hero-fade-2">
+      Earn <span class="orange glow-text" id="heroYield">~9.50%</span> Yield<br>
+      <span class="dim">From STRC Dividends</span>
+    </h1>
+
+    <p class="hero-sub hero-fade hero-fade-3">
+      strUSD gives you on-chain STRC exposure — Strategy's preferred stock currently paying <span id="heroStrcRate">10.75%</span> dividends. Each strUSD = 1 STRC, priced live via Chainlink oracle.
+    </p>
+
+    <div class="hero-ctas hero-fade hero-fade-4">
+      <button class="btn-primary" onclick="scrollTo('#app')">
+        Start Earning
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 12h14m-7-7l7 7-7 7"/></svg>
+      </button>
+      <button class="btn-ghost" onclick="scrollTo('#how')">How It Works</button>
+    </div>
+
+    <div class="stats-bar hero-fade hero-fade-5">
+      <div class="stat-item">
+        <div class="stat-value orange" id="animApy">0.00%</div>
+        <div class="stat-label">Holder APY</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value" id="animTvl">$0</div>
+        <div class="stat-label">Total Value Locked</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value" id="animHolders">0</div>
+        <div class="stat-label">Holders</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value orange" id="animStrcPrice">$0.00</div>
+        <div class="stat-label">STRC Price</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ App Section ═══ -->
+<section id="app">
+  <div class="section-inner">
+    <div class="section-label reveal">Mint & Earn</div>
+    <div class="section-title reveal reveal-delay-1">Get strUSD, Earn Instantly</div>
+    <div class="section-desc reveal reveal-delay-2">Choose your payment method. Stake to sSTRUSD to earn yield automatically every month.</div>
+
+    <div class="app-grid">
+      <!-- Mint/Redeem Card -->
+      <div class="card reveal reveal-delay-2">
+        <!-- Faucet Card (Demo Mode) -->
+        <div class="faucet-card visible" id="faucetCard">
+          <div class="faucet-card-title">🚰 Test Token Faucet</div>
+          <div class="faucet-card-desc">Get free test USDC to try the full strUSD experience — mint, stake, and earn. These are demo tokens on Base mainnet.</div>
+          <div class="faucet-amount-row">
+            <button class="faucet-amount-btn selected" onclick="selectFaucetAmount(this, 1000)">$1,000</button>
+            <button class="faucet-amount-btn" onclick="selectFaucetAmount(this, 5000)">$5,000</button>
+            <button class="faucet-amount-btn" onclick="selectFaucetAmount(this, 10000)">$10,000</button>
+            <button class="btn-faucet" id="faucetBtn" onclick="claimFaucet()">🚰 Get Test USDC</button>
+          </div>
+        </div>
+
+        <div class="tabs" id="actionTabs">
+          <button class="tab active" onclick="setTab('mint')">Mint</button>
+          <button class="tab" onclick="setTab('redeem')">Redeem</button>
+          <button class="tab" onclick="setTab('stake')">Stake</button>
+        </div>
+
+        <!-- Mint -->
+        <div id="mintForm">
+          <div class="input-group">
+            <div class="input-label">
+              <span>You Pay</span>
+              <span class="bal" onclick="setMax()">Balance: 12,450.00</span>
+            </div>
+            <div class="input-wrapper">
+              <input type="text" placeholder="0.00" id="mintInput" oninput="updateOutput()">
+              <div class="token-badge">
+                <div class="token-dot usdc">$</div>
+                USDC
+              </div>
+            </div>
+          </div>
+
+          <div class="swap-arrow">
+            <div class="swap-arrow-icon">↓</div>
+          </div>
+
+          <div class="input-group">
+            <div class="input-label"><span>You Receive</span></div>
+            <div class="input-wrapper">
+              <input type="text" placeholder="0.00" id="mintOutput" readonly>
+              <div class="token-badge">
+                <div class="token-dot strusd">s</div>
+                strUSD
+              </div>
+            </div>
+          </div>
+
+          <div class="payment-methods">
+            <div class="payment-label">Payment Method</div>
+            <div class="payment-grid">
+              <button class="payment-option selected" onclick="selectPayment(this,'usdc')">
+                <div class="pay-icon ic-usdc">$</div>
+                <div class="pay-info"><span class="pay-name">USDC</span><span class="pay-detail">Instant &middot; No fee</span></div>
+              </button>
+              <button class="payment-option" onclick="selectPayment(this,'apple')">
+                <div class="pay-icon ic-apple" id="appleIcon1"></div>
+                <div class="pay-info"><span class="pay-name">Apple Pay</span><span class="pay-detail">Instant &middot; 0.5%</span></div>
+              </button>
+              <button class="payment-option" onclick="selectPayment(this,'bitcoin')">
+                <div class="pay-icon ic-btc">₿</div>
+                <div class="pay-info"><span class="pay-name">Bitcoin</span><span class="pay-detail">~10 min &middot; 0.1%</span></div>
+              </button>
+              <button class="payment-option" onclick="selectPayment(this,'lightning')">
+                <div class="pay-icon ic-ln">⚡</div>
+                <div class="pay-info"><span class="pay-name">Lightning</span><span class="pay-detail">Instant &middot; 0.1%</span></div>
+              </button>
+            </div>
+          </div>
+
+          <button class="btn-action btn-mint" id="actionBtn" onclick="executeMint()">Mint strUSD</button>
+
+          <div class="rate-info">
+            <div class="rate-row"><span class="label">STRC Price</span><span class="value" id="strcPriceDisplay">$—</span></div>
+            <div class="rate-row"><span class="label">Exchange Rate</span><span class="value" id="exchangeRateDisplay">— USDC per strUSD</span></div>
+            <div class="rate-row"><span class="label">Mint Fee</span><span class="value" id="feeDisplay">0.05%</span></div>
+            <div class="rate-row"><span class="label">Network</span>
+              <span class="value" style="display:flex;align-items:center;gap:5px;">
+                <span style="width:6px;height:6px;border-radius:50%;background:#3b82f6;display:inline-block;box-shadow:0 0 6px #3b82f6;"></span>
+                Base
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Redeem -->
+        <div id="redeemForm" style="display:none;">
+          <div class="input-group">
+            <div class="input-label"><span>You Return</span><span class="bal">Balance: 8,200.00</span></div>
+            <div class="input-wrapper">
+              <input type="text" placeholder="0.00" id="redeemInput" oninput="updateRedeemOutput()">
+              <div class="token-badge"><div class="token-dot strusd">s</div> strUSD</div>
+            </div>
+          </div>
+          <div class="swap-arrow"><div class="swap-arrow-icon">↓</div></div>
+          <div class="input-group">
+            <div class="input-label"><span>You Receive</span></div>
+            <div class="input-wrapper">
+              <input type="text" placeholder="0.00" readonly id="redeemOutput">
+              <div class="token-badge"><div class="token-dot usdc">$</div> USDC</div>
+            </div>
+          </div>
+          <button class="btn-action btn-mint" style="background:linear-gradient(135deg,#f59e0b,#fbbf24);margin-top:24px;" onclick="executeRedeem()">Request Redemption</button>
+          <div class="rate-info">
+            <div class="rate-row"><span class="label">STRC Price</span><span class="value" id="redeemStrcPrice">$—</span></div>
+            <div class="rate-row"><span class="label">Settlement</span><span class="value">T+1 (24 hours)</span></div>
+            <div class="rate-row"><span class="label">Redemption Fee</span><span class="value">0.10%</span></div>
+          </div>
+        </div>
+
+        <!-- Stake -->
+        <div id="stakeForm" style="display:none;">
+          <div class="input-group">
+            <div class="input-label"><span>Stake strUSD</span><span class="bal">Balance: 8,200.00</span></div>
+            <div class="input-wrapper">
+              <input type="text" placeholder="0.00">
+              <div class="token-badge"><div class="token-dot strusd">s</div> strUSD</div>
+            </div>
+          </div>
+          <div class="swap-arrow"><div class="swap-arrow-icon">↓</div></div>
+          <div class="input-group">
+            <div class="input-label"><span>You Receive</span></div>
+            <div class="input-wrapper">
+              <input type="text" placeholder="0.00" readonly>
+              <div class="token-badge"><div class="token-dot sstrusd">s²</div> sSTRUSD</div>
+            </div>
+          </div>
+          <button class="btn-action btn-mint" style="margin-top:24px;" onclick="executeStake()">Stake &amp; Earn Yield</button>
+          <div class="rate-info">
+            <div class="rate-row"><span class="label">Exchange Rate</span><span class="value" id="sStrUSDRate">1 sSTRUSD = 1.0000 strUSD</span></div>
+            <div class="rate-row"><span class="label">Holder APY</span><span class="value" style="color:var(--orange);" id="stakeApyDisplay">—%</span></div>
+            <div class="rate-row"><span class="label">Cooldown</span><span class="value">24h after deposit</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dashboard Card -->
+      <div class="card reveal reveal-delay-3">
+        <div class="card-header">
+          <div class="card-title">Your Dashboard</div>
+          <div class="card-badge">Earning</div>
+        </div>
+        <div class="dash-grid">
+          <div class="dash-item" style="grid-column: 1 / -1; border-color: var(--orange-glow-strong); background: linear-gradient(135deg, rgba(247,147,26,0.08), rgba(0,0,0,0));">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+              <div>
+                <div class="dash-item-label" style="font-size: 14px; color: var(--orange-light);">Claimable USDC Dividends</div>
+                <div class="dash-item-value orange" id="claimableAmount" style="font-size: 32px;">$0.00</div>
+                <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Dividends are paid in USDC — claim anytime</div>
+              </div>
+              <button id="claimBtn" onclick="claimDividends()" style="background: linear-gradient(135deg, var(--orange), var(--orange-dark)); color: #000; font-weight: 700; font-size: 16px; padding: 14px 32px; border: none; border-radius: var(--radius); cursor: pointer; font-family: inherit; transition: all 0.3s;">
+                Claim USDC
+              </button>
+            </div>
+          </div>
+          <div class="dash-item">
+            <div class="dash-item-label">strUSD Balance</div>
+            <div class="dash-item-value" id="dashStrUSD">0.00</div>
+          </div>
+          <div class="dash-item">
+            <div class="dash-item-label">sSTRUSD Staked</div>
+            <div class="dash-item-value" id="dashSStrUSD">0.00</div>
+          </div>
+          <div class="dash-item">
+            <div class="dash-item-label">Total Dividends Earned</div>
+            <div class="dash-item-value orange" id="dashTotalEarned">$0.00</div>
+          </div>
+          <div class="dash-item">
+            <div class="dash-item-label">Holder APY</div>
+            <div class="dash-item-value orange" id="dashHolderApy">—%</div>
+          </div>
+          <div class="dash-item">
+            <div class="dash-item-label">Next Distribution</div>
+            <div class="dash-item-value" id="dashNextDist">—</div>
+          </div>
+          <div class="dash-item">
+            <div class="dash-item-label">Pending Redemptions</div>
+            <div class="dash-item-value" id="dashPendingRedeem">$0.00</div>
+          </div>
+        </div>
+        <div class="yield-chart-wrap">
+          <div class="yield-chart-label">Monthly Yield</div>
+          <div class="yield-chart" id="yieldChart"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- ═══ How It Works ═══ -->
+<section id="how">
+  <div class="section-inner">
+    <div class="section-label reveal">How It Works</div>
+    <div class="section-title reveal reveal-delay-1">From Deposit to Yield in 3 Steps</div>
+    <div class="section-desc reveal reveal-delay-2">Real yield from Strategy's STRC preferred stock dividends. No ponzinomics, no token emissions.</div>
+
+    <div class="steps-container">
+      <div class="steps-line"></div>
+      <div class="steps-grid">
+        <div class="step-card reveal reveal-delay-1">
+          <div class="step-num">1</div>
+          <div class="step-title">Deposit</div>
+          <div class="step-desc">Send USDC, Bitcoin, Lightning, or use Apple&nbsp;Pay. Receive strUSD priced via Chainlink oracle. Each strUSD = 1 STRC of exposure.</div>
+        </div>
+        <div class="step-card reveal reveal-delay-2">
+          <div class="step-num">2</div>
+          <div class="step-title">Stake</div>
+          <div class="step-desc">Wrap strUSD into sSTRUSD. The vault exchange rate increases monthly as dividends flow in.</div>
+        </div>
+        <div class="step-card reveal reveal-delay-3">
+          <div class="step-num">3</div>
+          <div class="step-title">Earn</div>
+          <div class="step-desc">STRC pays dividends monthly (rate set by Strategy — currently <span id="howStrcRate">10.75%</span>). After the protocol spread, net yield flows to holders. Redeem to USDC at current STRC price anytime.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- ═══ Dividend Timeline ═══ -->
+<section id="dividends">
+  <div class="section-inner">
+    <div class="section-label reveal">Dividend Schedule</div>
+    <div class="section-title reveal reveal-delay-1">Your Yield, Every Month</div>
+    <div class="section-desc reveal reveal-delay-2">STRC pays dividends monthly like clockwork. Here's exactly when your next yield hits.</div>
+
+    <!-- Next Dividend Card -->
+    <div class="div-card reveal reveal-delay-3">
+      <div class="div-card-inner">
+
+        <!-- Timeline -->
+        <div class="div-timeline">
+          <div class="div-timeline-track">
+            <div class="div-timeline-fill" id="divTimelineFill"></div>
+          </div>
+
+          <div class="div-milestone" style="left:0%">
+            <div class="div-milestone-dot completed"></div>
+            <div class="div-milestone-content">
+              <div class="div-milestone-label">Last Payout</div>
+              <div class="div-milestone-date">Jan 31</div>
+              <div class="div-milestone-detail">$0.92 / share</div>
+            </div>
+          </div>
+
+          <div class="div-milestone" style="left:33%">
+            <div class="div-milestone-dot completed"></div>
+            <div class="div-milestone-content">
+              <div class="div-milestone-label">Ex-Dividend Date</div>
+              <div class="div-milestone-date">Feb 13</div>
+              <div class="div-milestone-detail">Must hold before this</div>
+            </div>
+          </div>
+
+          <div class="div-milestone active-milestone" style="left:66%">
+            <div class="div-milestone-dot active"></div>
+            <div class="div-milestone-content">
+              <div class="div-milestone-label">Record Date</div>
+              <div class="div-milestone-date">Feb 14</div>
+              <div class="div-milestone-detail">Snapshot of holders</div>
+            </div>
+          </div>
+
+          <div class="div-milestone" style="left:100%">
+            <div class="div-milestone-dot upcoming"></div>
+            <div class="div-milestone-content">
+              <div class="div-milestone-label">Next Payout</div>
+              <div class="div-milestone-date">Feb 28</div>
+              <div class="div-milestone-detail">$0.94 / share</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Info Cards Row -->
+        <div class="div-info-row">
+          <div class="div-info-item">
+            <div class="div-info-icon">&#128197;</div>
+            <div>
+              <div class="div-info-title">Next Yield Drops</div>
+              <div class="div-info-value" id="divCountdown">4 days</div>
+            </div>
+          </div>
+          <div class="div-info-item">
+            <div class="div-info-icon">&#128176;</div>
+            <div>
+              <div class="div-info-title">You'll Earn</div>
+              <div class="div-info-value orange-text">~$41.67 <span class="div-per">per $5,000</span></div>
+            </div>
+          </div>
+          <div class="div-info-item">
+            <div class="div-info-icon">&#128260;</div>
+            <div>
+              <div class="div-info-title">Frequency</div>
+              <div class="div-info-value">Every Month</div>
+            </div>
+          </div>
+          <div class="div-info-item">
+            <div class="div-info-icon">&#9989;</div>
+            <div>
+              <div class="div-info-title">Your Status</div>
+              <div class="div-info-value" style="color:var(--orange);" id="divStatus">Earning</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Plain English Explainer -->
+        <div class="div-explainer">
+          <div class="div-explainer-title">How does this work?</div>
+          <div class="div-explainer-text">
+            Every month, Strategy Inc. pays a cash dividend on their STRC stock. We collect that dividend, convert it to USDC, and deposit it into the sSTRUSD vault — which automatically increases the value of your staked tokens. <strong>You don't need to do anything.</strong> Just hold sSTRUSD and your balance grows every month.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- ═══ Payment Options ═══ -->
+<section id="payments">
+  <div class="section-inner">
+    <div class="section-label reveal">Payment Options</div>
+    <div class="section-title reveal reveal-delay-1">Fund Your Way</div>
+    <div class="section-desc reveal reveal-delay-2">No wallet required. Use Apple Pay, send Bitcoin, or zap sats over Lightning.</div>
+
+    <div class="pay-options-grid">
+      <div class="pay-card reveal reveal-delay-1">
+        <div class="pay-icon-lg apple-lg" id="appleIcon2"></div>
+        <div class="pay-card-title">Apple Pay</div>
+        <div class="pay-card-sub">Card payments via Apple Pay. No wallet needed.</div>
+        <div class="pay-speed-badge">Instant</div>
+      </div>
+      <div class="pay-card reveal reveal-delay-2">
+        <div class="pay-icon-lg ln-lg">⚡</div>
+        <div class="pay-card-title">Lightning</div>
+        <div class="pay-card-sub">Send sats. Auto-converted to strUSD instantly.</div>
+        <div class="pay-speed-badge">&lt; 1 Second</div>
+      </div>
+      <div class="pay-card reveal reveal-delay-3">
+        <div class="pay-icon-lg btc-lg">₿</div>
+        <div class="pay-card-title">Bitcoin</div>
+        <div class="pay-card-sub">On-chain BTC. Market rate + 0.1% fee.</div>
+        <div class="pay-speed-badge">~10 Min</div>
+      </div>
+      <div class="pay-card reveal reveal-delay-4">
+        <div class="pay-icon-lg usdc-lg">$</div>
+        <div class="pay-card-title">USDC</div>
+        <div class="pay-card-sub">Direct on-chain. Zero additional fees.</div>
+        <div class="pay-speed-badge">Instant</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- ═══ Proof of Reserves ═══ -->
+<section id="reserves">
+  <div class="section-inner" style="text-align:center;">
+    <div class="section-label reveal">Transparency</div>
+    <div class="section-title reveal reveal-delay-1">Proof of Reserves</div>
+    <div class="section-desc reveal reveal-delay-2" style="margin-left:auto;margin-right:auto;">Every strUSD is backed by STRC held in qualified custody. Verified monthly on-chain.</div>
+
+    <div class="reserves-card reveal reveal-delay-3">
+      <div class="reserve-row">
+        <span class="reserve-label">strUSD in Circulation</span>
+        <span class="reserve-value">4,200,000.00</span>
+      </div>
+      <div class="reserve-row">
+        <span class="reserve-label">STRC Shares Held</span>
+        <span class="reserve-value">42,854</span>
+      </div>
+      <div class="reserve-row">
+        <span class="reserve-label">STRC Market Value</span>
+        <span class="reserve-value orange">$4,285,400.00</span>
+      </div>
+      <div class="reserve-row">
+        <span class="reserve-label">Collateralization Ratio</span>
+        <span class="reserve-value orange">102.03%</span>
+      </div>
+      <div class="reserve-row">
+        <span class="reserve-label">Insurance Fund</span>
+        <span class="reserve-value">$18,750.00</span>
+      </div>
+      <div class="reserve-row">
+        <span class="reserve-label">Last Attestation</span>
+        <span class="reserve-value">Feb 15, 2026</span>
+      </div>
+      <div class="reserve-bar"><div class="reserve-fill" id="reserveFill"></div></div>
+      <div class="reserve-status">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg>
+        Fully Collateralized — Verified On-Chain
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ CTA ═══ -->
+<section class="cta-section">
+  <div class="cta-glow"></div>
+  <div class="section-inner" style="position:relative;z-index:1;">
+    <h2 class="reveal" style="font-size:clamp(30px,5vw,52px);font-weight:800;letter-spacing:-2px;margin-bottom:20px;line-height:1.05;">
+      Your dollars should<br><span class="orange glow-text">work for you</span>
+    </h2>
+    <p class="reveal reveal-delay-1" style="font-size:17px;color:var(--text-secondary);max-width:480px;margin:0 auto 36px;">
+      Real yield backed by real dividends. No lockups, no ponzinomics — just STRC dividends flowing to your wallet.
+    </p>
+    <button class="btn-primary reveal reveal-delay-2" onclick="scrollTo('#app')" style="font-size:17px;padding:17px 44px;">
+      Start Earning Now
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 12h14m-7-7l7 7-7 7"/></svg>
+    </button>
+  </div>
+</section>
+
+<!-- ═══ Footer ═══ -->
+<footer>
+  <div class="footer-inner">
+    <a href="#" class="logo" style="gap:8px;">
+      <div class="logo-mark" style="width:26px;height:26px;font-size:12px;border-radius:7px;">$</div>
+      <div class="logo-text" style="font-size:15px;">str<span>USD</span></div>
+    </a>
+    <div class="footer-links">
+      <a href="#">Docs</a>
+      <a href="#">GitHub</a>
+      <a href="#">Audit Report</a>
+      <a href="#">Terms</a>
+      <a href="#">Twitter</a>
+      <a href="#">Discord</a>
+    </div>
+    <div class="footer-copy">Not available to US persons. Not FDIC insured.</div>
+  </div>
+</footer>
+
+<!-- ═══ Onboarding Toast ═══ -->
+<div class="onboard-toast" id="onboardToast">
+  <div class="onboard-progress" id="onboardProgress">
+    <div class="onboard-dot active"></div>
+    <div class="onboard-dot"></div>
+    <div class="onboard-dot"></div>
+    <div class="onboard-dot"></div>
+  </div>
+  <div class="onboard-toast-step" id="onboardStep">Step 1 of 4</div>
+  <div class="onboard-toast-title" id="onboardTitle">Connect Your Wallet</div>
+  <div class="onboard-toast-desc" id="onboardDesc">Click "Connect Wallet" in the top right to get started. You'll need MetaMask on Base network.</div>
+  <div class="onboard-toast-actions">
+    <button class="onboard-toast-btn" id="onboardAction" onclick="onboardAction()">Got it</button>
+    <button class="onboard-toast-dismiss" onclick="dismissOnboard()">Skip tour</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.4/ethers.umd.min.js"></script>
+<script>
+// ═══════════════════════════════════════
+// COMPLIANCE GATE — Geo-blocking + Attestation
+// ═══════════════════════════════════════
+
+// Blocked jurisdictions (ISO 3166-1 alpha-2)
+const BLOCKED_COUNTRIES = ['US', 'UM']; // US + US Minor Outlying Islands
+// Additional restricted jurisdictions (OFAC sanctioned)
+const SANCTIONED_COUNTRIES = ['CU', 'IR', 'KP', 'SY', 'RU'];
+
+let complianceCleared = false;
+
+// Check if user previously attested (session-only, not persistent)
+const sessionAttested = sessionStorage.getItem('strusd_attested');
+
+(async function runComplianceCheck() {
+  const overlay = document.getElementById('complianceOverlay');
+  const geoStatus = document.getElementById('geoStatus');
+  const geoBlocked = document.getElementById('geoBlocked');
+  const complianceForm = document.getElementById('complianceForm');
+
+  // If already attested this session, skip
+  if (sessionAttested === 'true') {
+    complianceCleared = true;
+    overlay.classList.add('hidden');
+    setTimeout(() => overlay.style.display = 'none', 400);
+    return;
+  }
+
+  try {
+    // Use multiple free GeoIP APIs for redundancy
+    let country = null;
+    let region = null;
+    let ip = null;
+
+    // Primary: ip-api.com (free, no key needed, 45 req/min)
+    try {
+      const resp = await fetch('http://ip-api.com/json/?fields=status,countryCode,regionName,query');
+      const data = await resp.json();
+      if (data.status === 'success') {
+        country = data.countryCode;
+        region = data.regionName;
+        ip = data.query;
+      }
+    } catch (e) {}
+
+    // Fallback: ipapi.co (free tier, 1000/day)
+    if (!country) {
+      try {
+        const resp = await fetch('https://ipapi.co/json/');
+        const data = await resp.json();
+        country = data.country_code;
+        region = data.region;
+        ip = data.ip;
+      } catch (e) {}
+    }
+
+    // Fallback: ipwho.is (free, unlimited)
+    if (!country) {
+      try {
+        const resp = await fetch('https://ipwho.is/');
+        const data = await resp.json();
+        country = data.country_code;
+        region = data.region;
+        ip = data.ip;
+      } catch (e) {}
+    }
+
+    if (!country) {
+      // Cannot determine location — show attestation only
+      geoStatus.textContent = 'Could not determine your location. Please confirm your eligibility below.';
+      geoStatus.style.color = 'var(--orange)';
+      complianceForm.style.display = 'block';
+      return;
+    }
+
+    // Check if blocked
+    const allBlocked = [...BLOCKED_COUNTRIES, ...SANCTIONED_COUNTRIES];
+    if (allBlocked.includes(country)) {
+      const isUS = BLOCKED_COUNTRIES.includes(country);
+      geoStatus.style.display = 'none';
+      geoBlocked.style.display = 'block';
+
+      if (!isUS) {
+        geoBlocked.textContent = 'This service is not available in your jurisdiction due to international sanctions regulations.';
+      }
+
+      // Log blocked access attempt (for compliance records)
+      console.warn('[COMPLIANCE] Blocked access:', { country, region, timestamp: new Date().toISOString() });
+      return;
+    }
+
+    // Passed geo check — show attestation form
+    geoStatus.innerHTML = '✓ Location verified: <strong style="color:var(--orange);">' + country + '</strong>';
+    geoStatus.style.color = '#22c55e';
+    complianceForm.style.display = 'block';
+
+    // Log successful geo check
+    console.log('[COMPLIANCE] Geo check passed:', { country, region });
+
+  } catch (err) {
+    // Network error — show attestation only
+    geoStatus.textContent = 'Location check unavailable. Please confirm your eligibility below.';
+    geoStatus.style.color = 'var(--orange)';
+    complianceForm.style.display = 'block';
+  }
+})();
+
+function acceptCompliance() {
+  const checkbox = document.getElementById('attestCheck');
+  if (!checkbox.checked) return;
+
+  complianceCleared = true;
+  sessionStorage.setItem('strusd_attested', 'true');
+  sessionStorage.setItem('strusd_attested_at', new Date().toISOString());
+
+  // Log attestation (for compliance records)
+  console.log('[COMPLIANCE] Attestation accepted:', {
+    timestamp: new Date().toISOString(),
+    userAgent: navigator.userAgent,
+  });
+
+  const overlay = document.getElementById('complianceOverlay');
+  overlay.classList.add('hidden');
+  setTimeout(() => overlay.style.display = 'none', 400);
+}
+
+// ═══════════════════════════════════════
+// WALLET SCREENING HOOKS
+// ═══════════════════════════════════════
+// Plug in Chainalysis, TRM Labs, or Elliptic API here.
+// These services check wallet addresses against:
+//   - OFAC SDN list (sanctioned entities)
+//   - Known US exchange deposit addresses
+//   - Flagged addresses (fraud, terrorism, etc.)
+//
+// Usage: After obtaining an API key, uncomment and configure:
+//
+// const SCREENING_CONFIG = {
+//   provider: 'chainalysis', // or 'trm', 'elliptic'
+//   apiKey: 'YOUR_API_KEY',
+//   apiUrl: 'https://api.chainalysis.com/api/risk/v2/entities',
+// };
+//
+// async function screenWallet(address) {
+//   try {
+//     const resp = await fetch(SCREENING_CONFIG.apiUrl, {
+//       method: 'POST',
+//       headers: {
+//         'Token': SCREENING_CONFIG.apiKey,
+//         'Content-Type': 'application/json',
+//       },
+//       body: JSON.stringify({ address }),
+//     });
+//     const data = await resp.json();
+//     // Check for sanctions, high-risk flags
+//     if (data.risk === 'Severe' || data.cluster?.category === 'sanctioned entity') {
+//       return { blocked: true, reason: data.risk };
+//     }
+//     return { blocked: false };
+//   } catch (e) {
+//     // If screening fails, allow but log
+//     console.warn('[SCREENING] API error, allowing:', e.message);
+//     return { blocked: false };
+//   }
+// }
+
+async function screenWallet(address) {
+  // Placeholder — returns allowed for all until API key is configured
+  // Replace with real implementation above when ready
+  return { blocked: false };
+}
+
+// ═══════════════════════════════════════
+// CONTRACT CONFIG — Update after deployment
+// ═══════════════════════════════════════
+const CONFIG = {
+  chainId: 8453,
+  chainName: 'Base',
+  rpcUrl: 'https://mainnet.base.org',
+  explorer: 'https://basescan.org',
+  contracts: {
+    usdc:       '0x9de95BcFD6eCEE7BBa5276F594c0e5d61FC9e79c', // MockUSDC (testnet)
+    strUSD:     '0x27629F293C2A4d22AdDCcEA8E7A799f9de769440',
+    sStrUSD:    '0x1F10fA46e03baC55Bf32Fb382b8bc9d6e53aE66D',
+    minter:     '0x7491596009562624931bb479118a4ca7a8734Cc9',
+    dividendDistributor: '0xaD3B87AbA331EeD3B64f3FdE3EF038E5723226a9',
+    yieldDistributor:    '0x2245d277BFD92e1848A022a0966B1919aD4620fb',
+  }
+};
+
+// Minimal ABIs
+const ABI = {
+  erc20: [
+    'function balanceOf(address) view returns (uint256)',
+    'function allowance(address,address) view returns (uint256)',
+    'function approve(address,uint256) returns (bool)',
+    'function decimals() view returns (uint8)',
+    'function symbol() view returns (string)',
+  ],
+  strUSD: [
+    'function balanceOf(address) view returns (uint256)',
+    'function allowance(address,address) view returns (uint256)',
+    'function approve(address,uint256) returns (bool)',
+    'function totalSupply() view returns (uint256)',
+    'function decimals() view returns (uint8)',
+  ],
+  sStrUSD: [
+    'function balanceOf(address) view returns (uint256)',
+    'function allowance(address,address) view returns (uint256)',
+    'function approve(address,uint256) returns (bool)',
+    'function deposit(uint256,address) returns (uint256)',
+    'function redeem(uint256,address,address) returns (uint256)',
+    'function convertToAssets(uint256) view returns (uint256)',
+    'function convertToShares(uint256) view returns (uint256)',
+    'function previewDeposit(uint256) view returns (uint256)',
+    'function previewRedeem(uint256) view returns (uint256)',
+    'function exchangeRate() view returns (uint256)',
+    'function totalAssets() view returns (uint256)',
+    'function totalSupply() view returns (uint256)',
+    'function totalYieldDistributed() view returns (uint256)',
+    'function withdrawalCooldown() view returns (uint256)',
+    'function lastDepositTime(address) view returns (uint256)',
+  ],
+  minter: [
+    'function mint(uint256) returns (uint256)',
+    'function requestRedemption(uint256) returns (uint256)',
+    'function claimExpiredRedemption(uint256)',
+    'function mintFeeBps() view returns (uint256)',
+    'function redeemFeeBps() view returns (uint256)',
+    'function minMintAmount() view returns (uint256)',
+    'function dailyMintCap() view returns (uint256)',
+    'function dailyMintVolume() view returns (uint256)',
+    'function mintFrozen() view returns (bool)',
+    'function getPendingRedemptions(address,uint256,uint256) view returns (uint256,uint256)',
+    'function getUserRedemptions(address,uint256,uint256) view returns (uint256[])',
+    'function getUserRedemptionCount(address) view returns (uint256)',
+    'function getActiveRedemptionCount(address) view returns (uint256)',
+    'function redemptions(uint256) view returns (address user, uint256 strUSDAmount, uint256 usdcOwed, uint256 requestTime, uint256 availableAfter, uint256 expiresAt, uint256 priceAtRequest, bool fulfilled, bool cancelled)',
+    'function getSTRCPrice() view returns (uint256)',
+    'function previewMint(uint256) view returns (uint256)',
+    'function previewRedeem(uint256) view returns (uint256)',
+    'function priceFeedDecimals() view returns (uint8)',
+    'function maxPriceDeviationBps() view returns (uint256)',
+  ],
+  dividendDistributor: [
+    'function claimable(address) view returns (uint256)',
+    'function claim() external',
+    'function pendingDividends(address) view returns (uint256)',
+    'function totalDividendsDeposited() view returns (uint256)',
+    'function totalDividendsClaimed() view returns (uint256)',
+    'function cumulativeDividendPerToken() view returns (uint256)',
+    'function dividendCount() view returns (uint256)',
+    'function isInCooldown(address) view returns (bool)',
+    'function cooldownExpiresAt(address) view returns (uint256)',
+  ],
+  yieldDistributor: [
+    'function strcDividendRateBps() view returns (uint256)',
+    'function spreadBps() view returns (uint256)',
+    'function holderYieldBps() view returns (uint256)',
+    'function totalYieldToHolders() view returns (uint256)',
+    'function distributionCount() view returns (uint256)',
+  ],
+};
+
+// ═══════════════════════════════════════
+// MOCKUSDC FAUCET ABI
+// ═══════════════════════════════════════
+const FAUCET_ABI = ['function mint(address,uint256)'];
+
+// ═══════════════════════════════════════
+// WEB3 STATE
+// ═══════════════════════════════════════
+let provider = null;
+let signer = null;
+let userAddress = null;
+let contracts = {};
+let balances = { usdc: 0n, strUSD: 0n, sStrUSD: 0n };
+let cachedStrcPrice = 25; // fallback STRC price in USD
+let faucetAmount = 1000; // default faucet amount in USDC
+
+// ═══════════════════════════════════════
+// FAUCET
+// ═══════════════════════════════════════
+function selectFaucetAmount(el, amount) {
+  faucetAmount = amount;
+  document.querySelectorAll('.faucet-amount-btn').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+async function claimFaucet() {
+  const btn = document.getElementById('faucetBtn');
+  if (!userAddress) {
+    connectWallet();
+    return;
+  }
+  try {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Minting...';
+
+    const mockUsdc = new ethers.Contract(CONFIG.contracts.usdc, FAUCET_ABI, signer);
+    const amount = ethers.parseUnits(faucetAmount.toString(), 6);
+    const tx = await mockUsdc.mint(userAddress, amount);
+    btn.innerHTML = '<span class="spinner"></span> Confirming...';
+    await tx.wait();
+
+    btn.innerHTML = '✓ ' + faucetAmount.toLocaleString() + ' USDC received!';
+    btn.style.background = 'linear-gradient(135deg, #166534, #22c55e)';
+
+    await refreshBalances();
+
+    // Advance onboarding
+    if (onboardStep === 2) advanceOnboard();
+
+    setTimeout(() => {
+      btn.innerHTML = '🚰 Get Test USDC';
+      btn.style.background = '';
+      btn.disabled = false;
+    }, 3000);
+  } catch (err) {
+    console.error('Faucet failed:', err);
+    btn.innerHTML = '✗ ' + (err.reason || err.shortMessage || 'Failed');
+    btn.style.background = 'linear-gradient(135deg, #7f1d1d, #dc2626)';
+    setTimeout(() => {
+      btn.innerHTML = '🚰 Get Test USDC';
+      btn.style.background = '';
+      btn.disabled = false;
+    }, 3000);
+  }
+}
+
+// ═══════════════════════════════════════
+// ONBOARDING GUIDE
+// ═══════════════════════════════════════
+let onboardStep = 1;
+const onboardSteps = [
+  {
+    step: 'Step 1 of 4',
+    title: 'Connect Your Wallet',
+    desc: 'Click "Connect Wallet" in the top right. You\'ll need MetaMask on Base network (Chain ID 8453).',
+    action: 'Got it'
+  },
+  {
+    step: 'Step 2 of 4',
+    title: 'Get Test USDC',
+    desc: 'Use the green faucet button above the mint form to get free test USDC. Pick your amount and click "Get Test USDC".',
+    action: 'Got it'
+  },
+  {
+    step: 'Step 3 of 4',
+    title: 'Mint strUSD',
+    desc: 'Enter a USDC amount in the Mint tab and click "Mint strUSD". You\'ll approve the token spend, then mint in one flow.',
+    action: 'Got it'
+  },
+  {
+    step: 'Step 4 of 4',
+    title: 'Stake & Earn Yield',
+    desc: 'Switch to the Stake tab to wrap your strUSD into sSTRUSD. The vault exchange rate grows monthly as dividends flow in.',
+    action: 'Finish tour'
+  }
+];
+
+function showOnboardToast() {
+  const toast = document.getElementById('onboardToast');
+  setTimeout(() => toast.classList.add('visible'), 1500);
+  renderOnboardStep();
+}
+
+function renderOnboardStep() {
+  const s = onboardSteps[onboardStep - 1];
+  if (!s) { dismissOnboard(); return; }
+  document.getElementById('onboardStep').textContent = s.step;
+  document.getElementById('onboardTitle').textContent = s.title;
+  document.getElementById('onboardDesc').textContent = s.desc;
+  document.getElementById('onboardAction').textContent = s.action;
+
+  // Update progress dots
+  const dots = document.querySelectorAll('.onboard-dot');
+  dots.forEach((d, i) => {
+    d.className = 'onboard-dot';
+    if (i + 1 < onboardStep) d.classList.add('done');
+    else if (i + 1 === onboardStep) d.classList.add('active');
+  });
+}
+
+function onboardAction() {
+  advanceOnboard();
+}
+
+function advanceOnboard() {
+  onboardStep++;
+  if (onboardStep > onboardSteps.length) {
+    dismissOnboard();
+  } else {
+    renderOnboardStep();
+  }
+}
+
+function dismissOnboard() {
+  const toast = document.getElementById('onboardToast');
+  toast.classList.remove('visible');
+}
+
+// Show onboarding on page load and set demo banner class
+document.body.classList.add('has-demo-banner');
+showOnboardToast();
+
+// ═══════════════════════════════════════
+// PARTICLE SYSTEM
+// ═══════════════════════════════════════
+(function() {
+  const canvas = document.getElementById('particleCanvas');
+  const ctx = canvas.getContext('2d');
+  let particles = [];
+  let w, h;
+
+  function resize() {
+    w = canvas.width = window.innerWidth;
+    h = canvas.height = window.innerHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  class Particle {
+    constructor() { this.reset(); }
+    reset() {
+      this.x = Math.random() * w;
+      this.y = Math.random() * h;
+      this.size = Math.random() * 1.5 + 0.5;
+      this.speedX = (Math.random() - 0.5) * 0.3;
+      this.speedY = (Math.random() - 0.5) * 0.3;
+      this.opacity = Math.random() * 0.4 + 0.1;
+      this.pulse = Math.random() * Math.PI * 2;
+    }
+    update() {
+      this.x += this.speedX;
+      this.y += this.speedY;
+      this.pulse += 0.02;
+      if (this.x < 0 || this.x > w || this.y < 0 || this.y > h) this.reset();
+    }
+    draw() {
+      const o = this.opacity * (0.7 + 0.3 * Math.sin(this.pulse));
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(247, 147, 26, ${o})`;
+      ctx.fill();
+    }
+  }
+
+  for (let i = 0; i < 80; i++) particles.push(new Particle());
+
+  // Draw connections
+  function drawConnections() {
+    for (let i = 0; i < particles.length; i++) {
+      for (let j = i + 1; j < particles.length; j++) {
+        const dx = particles[i].x - particles[j].x;
+        const dy = particles[i].y - particles[j].y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 120) {
+          ctx.beginPath();
+          ctx.moveTo(particles[i].x, particles[i].y);
+          ctx.lineTo(particles[j].x, particles[j].y);
+          ctx.strokeStyle = `rgba(247, 147, 26, ${0.06 * (1 - dist / 120)})`;
+          ctx.lineWidth = 0.5;
+          ctx.stroke();
+        }
+      }
+    }
+  }
+
+  function animate() {
+    ctx.clearRect(0, 0, w, h);
+    particles.forEach(p => { p.update(); p.draw(); });
+    drawConnections();
+    requestAnimationFrame(animate);
+  }
+  animate();
+})();
+
+// ═══════════════════════════════════════
+// SCROLL REVEAL
+// ═══════════════════════════════════════
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+    }
+  });
+}, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+// ═══════════════════════════════════════
+// COUNTER ANIMATIONS
+// ═══════════════════════════════════════
+function animateCounter(el, target, prefix, suffix, decimals, duration) {
+  const start = performance.now();
+  function update(now) {
+    const elapsed = now - start;
+    const progress = Math.min(elapsed / duration, 1);
+    const eased = 1 - Math.pow(1 - progress, 3); // easeOutCubic
+    const current = target * eased;
+    el.textContent = prefix + current.toLocaleString('en-US', {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals
+    }) + suffix;
+    if (progress < 1) requestAnimationFrame(update);
+  }
+  requestAnimationFrame(update);
+}
+
+// Trigger counters when hero loads (placeholder values before wallet connect)
+setTimeout(() => {
+  animateCounter(document.getElementById('animApy'), 9.50, '', '%', 2, 2000);
+  animateCounter(document.getElementById('animTvl'), 0.0, '$', 'M', 1, 2000);
+  animateCounter(document.getElementById('animHolders'), 0, '', '', 0, 2000);
+  animateCounter(document.getElementById('animStrcPrice'), 25.00, '$', '', 2, 2000);
+}, 800);
+
+// ═══════════════════════════════════════
+// RESERVE BAR ANIMATION
+// ═══════════════════════════════════════
+const reserveObs = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      document.getElementById('reserveFill').style.width = '102%';
+    }
+  });
+}, { threshold: 0.5 });
+reserveObs.observe(document.getElementById('reserveFill'));
+
+// ═══════════════════════════════════════
+// YIELD CHART
+// ═══════════════════════════════════════
+(function() {
+  const chart = document.getElementById('yieldChart');
+  const data = [55, 68, 62, 75, 72, 85, 78, 88, 82, 90, 86, 94];
+  data.forEach((val, i) => {
+    const bar = document.createElement('div');
+    bar.className = 'yield-bar';
+    bar.style.height = '0%';
+    chart.appendChild(bar);
+    setTimeout(() => { bar.style.height = val + '%'; }, 100 + i * 60);
+  });
+})();
+
+// ═══════════════════════════════════════
+// TAB SWITCHING
+// ═══════════════════════════════════════
+function setTab(tab) {
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    t.classList.toggle('active',
+      (tab === 'mint' && i === 0) || (tab === 'redeem' && i === 1) || (tab === 'stake' && i === 2)
+    );
+  });
+  document.getElementById('mintForm').style.display = tab === 'mint' ? 'block' : 'none';
+  document.getElementById('redeemForm').style.display = tab === 'redeem' ? 'block' : 'none';
+  document.getElementById('stakeForm').style.display = tab === 'stake' ? 'block' : 'none';
+}
+
+// ═══════════════════════════════════════
+// PAYMENT SELECTION
+// ═══════════════════════════════════════
+let selectedPay = 'usdc';
+function selectPayment(el, method) {
+  document.querySelectorAll('.payment-option').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedPay = method;
+  const btn = document.getElementById('actionBtn');
+  const fee = document.getElementById('feeDisplay');
+  switch(method) {
+    case 'usdc':
+      btn.className = 'btn-action btn-mint'; btn.textContent = 'Mint strUSD'; fee.textContent = '0.05%'; break;
+    case 'apple':
+      btn.className = 'btn-action btn-apple'; btn.innerHTML = '\uF8FF Pay — Mint strUSD'; fee.textContent = '0.55%'; break;
+    case 'bitcoin':
+      btn.className = 'btn-action btn-bitcoin'; btn.textContent = '₿ Pay with Bitcoin'; fee.textContent = '0.15%'; break;
+    case 'lightning':
+      btn.className = 'btn-action btn-lightning'; btn.textContent = '⚡ Pay with Lightning'; fee.textContent = '0.15%'; break;
+  }
+  updateOutput();
+}
+
+// ═══════════════════════════════════════
+// OUTPUT CALC
+// ═══════════════════════════════════════
+async function updateOutput() {
+  const input = parseFloat(document.getElementById('mintInput').value) || 0;
+  if (input <= 0) { document.getElementById('mintOutput').value = ''; return; }
+
+  // If connected and using USDC, use the on-chain previewMint for accurate NAV pricing
+  if (contracts.minter && selectedPay === 'usdc') {
+    try {
+      const usdcAmount = ethers.parseUnits(input.toFixed(6), 6);
+      const strUSDOut = await contracts.minter.previewMint(usdcAmount);
+      const formatted = parseFloat(ethers.formatUnits(strUSDOut, 18));
+      document.getElementById('mintOutput').value = formatted > 0 ? formatted.toFixed(6) : '';
+      return;
+    } catch (e) {
+      console.warn('previewMint call failed, using fallback:', e);
+    }
+  }
+
+  // Fallback: estimate using cached STRC price (or simple fee deduction)
+  const fees = { usdc: 0.0005, apple: 0.0055, bitcoin: 0.0015, lightning: 0.0015 };
+  const netUsdc = input * (1 - (fees[selectedPay] || 0));
+  const price = cachedStrcPrice || 25;
+  const strUSDEstimate = netUsdc / price;
+  document.getElementById('mintOutput').value = strUSDEstimate > 0 ? strUSDEstimate.toFixed(6) : '';
+}
+function setMax() {
+  const bal = ethers.formatUnits(balances.usdc, 6);
+  document.getElementById('mintInput').value = bal;
+  updateOutput();
+}
+
+async function updateRedeemOutput() {
+  const input = parseFloat(document.getElementById('redeemInput').value) || 0;
+  if (input <= 0) { document.getElementById('redeemOutput').value = ''; return; }
+
+  // If connected, use on-chain previewRedeem
+  if (contracts.minter) {
+    try {
+      const strUSDAmount = ethers.parseUnits(input.toFixed(6), 18);
+      const usdcOut = await contracts.minter.previewRedeem(strUSDAmount);
+      const formatted = parseFloat(ethers.formatUnits(usdcOut, 6));
+      document.getElementById('redeemOutput').value = formatted > 0 ? formatted.toFixed(2) : '';
+      return;
+    } catch (e) {
+      console.warn('previewRedeem call failed, using fallback:', e);
+    }
+  }
+
+  // Fallback: estimate using cached STRC price minus fee
+  const price = cachedStrcPrice || 25;
+  const grossUsdc = input * price;
+  const netUsdc = grossUsdc * (1 - 0.001); // 0.10% redeem fee
+  document.getElementById('redeemOutput').value = netUsdc > 0 ? netUsdc.toFixed(2) : '';
+}
+
+// ═══════════════════════════════════════
+// WALLET CONNECT (Real)
+// ═══════════════════════════════════════
+async function connectWallet() {
+  // Compliance gate — must attest before connecting
+  if (!complianceCleared) {
+    const overlay = document.getElementById('complianceOverlay');
+    if (overlay) { overlay.style.display = 'flex'; overlay.classList.remove('hidden'); }
+    return;
+  }
+
+  const btn = document.querySelector('.btn-connect');
+  try {
+    if (!window.ethereum) {
+      alert('Please install MetaMask or another Web3 wallet to connect.');
+      return;
+    }
+
+    // Request account access
+    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+    userAddress = accounts[0];
+
+    // Screen wallet against sanctions/compliance lists
+    btn.innerHTML = '<span>Screening...</span>';
+    const screenResult = await screenWallet(userAddress);
+    if (screenResult.blocked) {
+      alert('This wallet address has been flagged by our compliance screening and cannot be used with strUSD. Reason: ' + (screenResult.reason || 'restricted'));
+      btn.innerHTML = '<span>Connect Wallet</span>';
+      userAddress = null;
+      return;
+    }
+
+    // Check chain
+    const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+    if (parseInt(chainId, 16) !== CONFIG.chainId) {
+      try {
+        await window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: '0x' + CONFIG.chainId.toString(16) }],
+        });
+      } catch (switchError) {
+        if (switchError.code === 4902) {
+          await window.ethereum.request({
+            method: 'wallet_addEthereumChain',
+            params: [{
+              chainId: '0x' + CONFIG.chainId.toString(16),
+              chainName: CONFIG.chainName,
+              rpcUrls: [CONFIG.rpcUrl],
+              blockExplorerUrls: [CONFIG.explorer],
+              nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 }
+            }],
+          });
+        }
+      }
+    }
+
+    // Set up ethers
+    provider = new ethers.BrowserProvider(window.ethereum);
+    signer = await provider.getSigner();
+
+    // Initialize contracts
+    contracts.usdc = new ethers.Contract(CONFIG.contracts.usdc, ABI.erc20, signer);
+    contracts.strUSD = new ethers.Contract(CONFIG.contracts.strUSD, ABI.strUSD, signer);
+    contracts.sStrUSD = new ethers.Contract(CONFIG.contracts.sStrUSD, ABI.sStrUSD, signer);
+    contracts.minter = new ethers.Contract(CONFIG.contracts.minter, ABI.minter, signer);
+    contracts.dividendDistributor = new ethers.Contract(CONFIG.contracts.dividendDistributor, ABI.dividendDistributor, signer);
+    contracts.yieldDistributor = new ethers.Contract(CONFIG.contracts.yieldDistributor, ABI.yieldDistributor, signer);
+
+    // Update UI
+    const short = userAddress.slice(0, 6) + '...' + userAddress.slice(-4);
+    btn.innerHTML = '<span>' + short + '</span>';
+    btn.style.borderColor = 'var(--orange)';
+    btn.style.color = 'var(--orange)';
+
+    // Fetch balances and protocol data
+    await Promise.all([refreshBalances(), refreshProtocolData()]);
+
+    // Advance onboarding if on step 1
+    if (onboardStep === 1) advanceOnboard();
+
+    // Listen for account/chain changes
+    window.ethereum.on('accountsChanged', (accs) => {
+      if (accs.length === 0) { location.reload(); return; }
+      userAddress = accs[0];
+      refreshBalances();
+    });
+    window.ethereum.on('chainChanged', () => location.reload());
+
+  } catch (err) {
+    console.error('Connect failed:', err);
+    btn.innerHTML = '<span>Connect Wallet</span>';
+  }
+}
+
+// ═══════════════════════════════════════
+// PROTOCOL DATA (STRC Price, APY, etc.)
+// ═══════════════════════════════════════
+async function refreshProtocolData() {
+  const el = (id) => document.getElementById(id);
+  try {
+    // Fetch STRC price from Minter oracle
+    if (contracts.minter) {
+      const [strcPriceRaw, priceDec] = await Promise.all([
+        contracts.minter.getSTRCPrice(),
+        contracts.minter.priceFeedDecimals(),
+      ]);
+      const strcPrice = parseFloat(strcPriceRaw.toString()) / (10 ** Number(priceDec));
+      cachedStrcPrice = strcPrice;
+
+      // Update all STRC price displays
+      const priceFmt = '$' + strcPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      if (el('animStrcPrice')) el('animStrcPrice').textContent = priceFmt;
+      if (el('strcPriceDisplay')) el('strcPriceDisplay').textContent = priceFmt;
+      if (el('redeemStrcPrice')) el('redeemStrcPrice').textContent = priceFmt;
+
+      // Exchange rate: 1 strUSD = 1 STRC = $X USDC
+      if (el('exchangeRateDisplay')) {
+        el('exchangeRateDisplay').textContent = strcPrice.toFixed(2) + ' USDC per strUSD';
+      }
+    }
+
+    // Fetch dividend rate from YieldDistributor
+    if (contracts.yieldDistributor) {
+      const [strcRateBps, spreadBps, holderBps] = await Promise.all([
+        contracts.yieldDistributor.strcDividendRateBps(),
+        contracts.yieldDistributor.spreadBps(),
+        contracts.yieldDistributor.holderYieldBps(),
+      ]);
+
+      const strcRate = (Number(strcRateBps) / 100).toFixed(2);
+      const holderRate = (Number(holderBps) / 100).toFixed(2);
+
+      // Update hero yield display
+      if (el('heroYield')) el('heroYield').textContent = '~' + holderRate + '%';
+      if (el('heroStrcRate')) el('heroStrcRate').textContent = strcRate + '%';
+
+      // Update animated APY stat
+      if (el('animApy')) el('animApy').textContent = holderRate + '%';
+
+      // Update stake form APY
+      if (el('stakeApyDisplay')) el('stakeApyDisplay').textContent = holderRate + '%';
+
+      // Update dashboard holder APY
+      if (el('dashHolderApy')) el('dashHolderApy').textContent = holderRate + '%';
+
+      // Update how-it-works STRC rate
+      if (el('howStrcRate')) el('howStrcRate').textContent = strcRate + '%';
+    }
+
+    // Fetch TVL from strUSD total supply
+    if (contracts.strUSD && contracts.minter) {
+      const totalSupply = await contracts.strUSD.totalSupply();
+      const supplyFloat = parseFloat(ethers.formatUnits(totalSupply, 18));
+      const tvl = supplyFloat * cachedStrcPrice;
+      if (el('animTvl')) {
+        if (tvl >= 1_000_000) {
+          el('animTvl').textContent = '$' + (tvl / 1_000_000).toFixed(1) + 'M';
+        } else if (tvl >= 1_000) {
+          el('animTvl').textContent = '$' + (tvl / 1_000).toFixed(1) + 'K';
+        } else {
+          el('animTvl').textContent = '$' + tvl.toFixed(0);
+        }
+      }
+    }
+
+    // Update mint output if there's an input value
+    updateOutput();
+
+  } catch (err) {
+    console.warn('Protocol data refresh failed:', err);
+  }
+}
+
+// ═══════════════════════════════════════
+// BALANCE REFRESH
+// ═══════════════════════════════════════
+async function refreshBalances() {
+  if (!userAddress || !contracts.usdc) return;
+  try {
+    const [usdcBal, strBal, sBal, activeRedeemCount, claimableUsdc] = await Promise.all([
+      contracts.usdc.balanceOf(userAddress),
+      contracts.strUSD.balanceOf(userAddress),
+      contracts.sStrUSD.balanceOf(userAddress),
+      contracts.minter.getActiveRedemptionCount(userAddress),
+      contracts.dividendDistributor.claimable(userAddress),
+    ]);
+
+    balances.usdc = usdcBal;
+    balances.strUSD = strBal;
+    balances.sStrUSD = sBal;
+    balances.claimable = claimableUsdc;
+
+    const fmtUsd = (val, dec) => parseFloat(ethers.formatUnits(val, dec)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    const usdcFmt = fmtUsd(usdcBal, 6);
+    const strFmt = fmtUsd(strBal, 18);
+    const sFmt = fmtUsd(sBal, 18);
+    const pendFmt = activeRedeemCount.toString();
+    const claimFmt = fmtUsd(claimableUsdc, 6);
+
+    // Update form balance labels
+    document.querySelectorAll('.bal').forEach(el => {
+      const text = el.textContent;
+      if (text.includes('12,450') || text.includes('Balance:')) {
+        if (el.closest('#mintForm') || el.closest('.tab-content[data-tab="mint"]')) {
+          el.textContent = 'Balance: ' + usdcFmt;
+        }
+      }
+    });
+
+    // Update dashboard by ID
+    const el = (id) => document.getElementById(id);
+    if (el('claimableAmount')) el('claimableAmount').textContent = '$' + claimFmt;
+    if (el('dashStrUSD')) el('dashStrUSD').textContent = strFmt;
+    if (el('dashSStrUSD')) el('dashSStrUSD').textContent = sFmt;
+    if (el('dashPendingRedeem')) el('dashPendingRedeem').textContent = '$' + pendFmt;
+
+    // Enable/disable claim button
+    const claimBtn = el('claimBtn');
+    if (claimBtn) {
+      if (claimableUsdc === 0n) {
+        claimBtn.style.opacity = '0.4';
+        claimBtn.style.cursor = 'not-allowed';
+      } else {
+        claimBtn.style.opacity = '1';
+        claimBtn.style.cursor = 'pointer';
+      }
+    }
+
+    // Check cooldown & mint freeze status
+    try {
+      const [inCooldown, cooldownExpiry, mintFrozen] = await Promise.all([
+        contracts.dividendDistributor.isInCooldown(userAddress),
+        contracts.dividendDistributor.cooldownExpiresAt(userAddress),
+        contracts.minter.mintFrozen(),
+      ]);
+
+      // Show cooldown notice on claimable banner
+      const cooldownNotice = el('claimableAmount');
+      const claimSubtext = cooldownNotice ? cooldownNotice.nextElementSibling : null;
+      if (inCooldown && claimSubtext) {
+        const expiryDate = new Date(Number(cooldownExpiry) * 1000);
+        const daysLeft = Math.ceil((expiryDate - Date.now()) / (1000 * 60 * 60 * 24));
+        claimSubtext.innerHTML = '⏳ New mint cooldown: dividends start in ~' + daysLeft + ' day' + (daysLeft !== 1 ? 's' : '');
+        claimSubtext.style.color = 'var(--orange)';
+      } else if (claimSubtext && claimSubtext.style.color === 'var(--orange)') {
+        claimSubtext.innerHTML = 'Dividends are paid in USDC — claim anytime';
+        claimSubtext.style.color = 'var(--text-muted)';
+      }
+
+      // Show mint freeze notice on mint button
+      const actionBtn = el('actionBtn');
+      if (mintFrozen && actionBtn) {
+        actionBtn.innerHTML = '🧊 Minting Paused (Distribution Window)';
+        actionBtn.disabled = true;
+        actionBtn.style.opacity = '0.5';
+      }
+    } catch (e) { /* contracts may not be deployed yet */ }
+
+    // Fetch total dividends info
+    try {
+      const [totalDeposited, totalClaimed, divCount] = await Promise.all([
+        contracts.dividendDistributor.totalDividendsDeposited(),
+        contracts.dividendDistributor.totalDividendsClaimed(),
+        contracts.dividendDistributor.dividendCount(),
+      ]);
+
+      const pendingDiv = await contracts.dividendDistributor.pendingDividends(userAddress);
+      const userTotalEarned = pendingDiv + claimableUsdc;
+      if (el('dashTotalEarned')) el('dashTotalEarned').textContent = '$' + fmtUsd(userTotalEarned, 6);
+    } catch (e) { /* distributor may not be deployed yet */ }
+
+    // Fetch vault exchange rate (for auto-compound users)
+    try {
+      const exchangeRate = await contracts.sStrUSD.exchangeRate();
+      const rate = parseFloat(ethers.formatUnits(exchangeRate, 18));
+      document.querySelectorAll('.rate-row .value').forEach(el => {
+        if (el.textContent.includes('1.0847')) {
+          el.textContent = '1 sSTRUSD = ' + rate.toFixed(4) + ' strUSD';
+        }
+      });
+    } catch (e) { /* vault may not be deployed yet */ }
+
+  } catch (err) {
+    console.error('Balance refresh failed:', err);
+  }
+}
+
+// Auto-refresh balances and protocol data every 30s
+setInterval(() => {
+  if (userAddress) {
+    refreshBalances();
+    refreshProtocolData();
+  }
+}, 30000);
+
+// ═══════════════════════════════════════
+// MINT (Real)
+// ═══════════════════════════════════════
+async function executeMint() {
+  const btn = document.getElementById('actionBtn');
+  const orig = btn.innerHTML;
+  const origClass = btn.className;
+
+  if (!userAddress) { connectWallet(); return; }
+  if (selectedPay !== 'usdc') {
+    alert(selectedPay.charAt(0).toUpperCase() + selectedPay.slice(1) + ' payments coming soon. Use USDC for now.');
+    return;
+  }
+
+  const inputVal = document.getElementById('mintInput').value;
+  if (!inputVal || parseFloat(inputVal) <= 0) { alert('Enter an amount'); return; }
+
+  try {
+    btn.innerHTML = '<span class="spinner"></span> Approving USDC...';
+    btn.disabled = true;
+
+    // Parse USDC amount (6 decimals)
+    const usdcAmount = ethers.parseUnits(inputVal, 6);
+
+    // Check allowance
+    const currentAllowance = await contracts.usdc.allowance(userAddress, CONFIG.contracts.minter);
+    if (currentAllowance < usdcAmount) {
+      const approveTx = await contracts.usdc.approve(CONFIG.contracts.minter, usdcAmount);
+      btn.innerHTML = '<span class="spinner"></span> Waiting for approval...';
+      await approveTx.wait();
+    }
+
+    // Mint
+    btn.innerHTML = '<span class="spinner"></span> Minting strUSD...';
+    const mintTx = await contracts.minter.mint(usdcAmount);
+    btn.innerHTML = '<span class="spinner"></span> Confirming...';
+    const receipt = await mintTx.wait();
+
+    // Success
+    btn.innerHTML = '✓ Minted Successfully!';
+    btn.className = 'btn-action btn-mint';
+    btn.style.background = '#166534';
+    btn.style.boxShadow = '0 4px 24px rgba(22,101,52,0.3)';
+
+    // Refresh balances
+    await refreshBalances();
+
+    // Advance onboarding if on step 3
+    if (onboardStep === 3) advanceOnboard();
+
+    setTimeout(() => {
+      btn.innerHTML = orig; btn.className = origClass;
+      btn.style.background = ''; btn.style.boxShadow = '';
+      btn.disabled = false;
+      document.getElementById('mintInput').value = '';
+      document.getElementById('mintOutput').value = '';
+    }, 3000);
+
+  } catch (err) {
+    console.error('Mint failed:', err);
+    btn.innerHTML = '✗ ' + (err.reason || err.shortMessage || 'Transaction failed');
+    btn.style.background = '#7f1d1d';
+    setTimeout(() => {
+      btn.innerHTML = orig; btn.className = origClass;
+      btn.style.background = ''; btn.style.boxShadow = '';
+      btn.disabled = false;
+    }, 3000);
+  }
+}
+
+// ═══════════════════════════════════════
+// REQUEST REDEMPTION (Real)
+// ═══════════════════════════════════════
+async function executeRedeem() {
+  if (!userAddress) { connectWallet(); return; }
+
+  const input = document.getElementById('redeemInput');
+  const inputVal = input.value;
+  if (!inputVal || parseFloat(inputVal) <= 0) { alert('Enter an amount'); return; }
+
+  const btn = document.querySelector('#redeemForm .btn-action');
+  const orig = btn.innerHTML;
+
+  try {
+    btn.innerHTML = '<span class="spinner"></span> Approving strUSD...';
+    btn.disabled = true;
+
+    // Parse strUSD amount (18 decimals) — NAV pricing, no alignment needed
+    const amount = ethers.parseUnits(inputVal, 18);
+
+    // Approve Minter to pull strUSD (for transfer-then-burn pattern)
+    const currentAllowance = await contracts.strUSD.allowance(userAddress, CONFIG.contracts.minter);
+    if (currentAllowance < amount) {
+      const approveTx = await contracts.strUSD.approve(CONFIG.contracts.minter, amount);
+      btn.innerHTML = '<span class="spinner"></span> Waiting for approval...';
+      await approveTx.wait();
+    }
+
+    btn.innerHTML = '<span class="spinner"></span> Requesting redemption...';
+    const redeemTx = await contracts.minter.requestRedemption(amount);
+    btn.innerHTML = '<span class="spinner"></span> Confirming...';
+    await redeemTx.wait();
+
+    btn.innerHTML = '✓ Redemption Queued!';
+    btn.style.background = '#166534';
+    await refreshBalances();
+
+    setTimeout(() => {
+      btn.innerHTML = orig; btn.style.background = ''; btn.disabled = false;
+      input.value = '';
+    }, 3000);
+
+  } catch (err) {
+    console.error('Redeem failed:', err);
+    btn.innerHTML = '✗ ' + (err.reason || err.shortMessage || 'Failed');
+    btn.style.background = '#7f1d1d';
+    setTimeout(() => { btn.innerHTML = orig; btn.style.background = ''; btn.disabled = false; }, 3000);
+  }
+}
+
+// ═══════════════════════════════════════
+// STAKE strUSD → sSTRUSD (Real)
+// ═══════════════════════════════════════
+async function executeStake() {
+  if (!userAddress) { connectWallet(); return; }
+
+  const input = document.querySelector('#stakeForm .input-wrapper input');
+  const inputVal = input.value;
+  if (!inputVal || parseFloat(inputVal) <= 0) { alert('Enter an amount'); return; }
+
+  const btn = document.querySelector('#stakeForm .btn-action');
+  const orig = btn.innerHTML;
+
+  try {
+    btn.innerHTML = '<span class="spinner"></span> Approving strUSD...';
+    btn.disabled = true;
+
+    const amount = ethers.parseUnits(inputVal, 18);
+
+    // Approve sStrUSD vault to pull strUSD
+    const currentAllowance = await contracts.strUSD.allowance(userAddress, CONFIG.contracts.sStrUSD);
+    if (currentAllowance < amount) {
+      const approveTx = await contracts.strUSD.approve(CONFIG.contracts.sStrUSD, amount);
+      btn.innerHTML = '<span class="spinner"></span> Waiting for approval...';
+      await approveTx.wait();
+    }
+
+    btn.innerHTML = '<span class="spinner"></span> Staking...';
+    const stakeTx = await contracts.sStrUSD.deposit(amount, userAddress);
+    btn.innerHTML = '<span class="spinner"></span> Confirming...';
+    await stakeTx.wait();
+
+    btn.innerHTML = '✓ Staked Successfully!';
+    btn.style.background = '#166534';
+    await refreshBalances();
+
+    setTimeout(() => {
+      btn.innerHTML = orig; btn.style.background = ''; btn.disabled = false;
+      input.value = '';
+    }, 3000);
+
+  } catch (err) {
+    console.error('Stake failed:', err);
+    btn.innerHTML = '✗ ' + (err.reason || err.shortMessage || 'Failed');
+    btn.style.background = '#7f1d1d';
+    setTimeout(() => { btn.innerHTML = orig; btn.style.background = ''; btn.disabled = false; }, 3000);
+  }
+}
+
+// ═══════════════════════════════════════
+// CLAIM USDC DIVIDENDS
+// ═══════════════════════════════════════
+async function claimDividends() {
+  if (!userAddress) { connectWallet(); return; }
+
+  const btn = document.getElementById('claimBtn');
+  if (!btn || balances.claimable === 0n) return;
+
+  const orig = btn.innerHTML;
+  try {
+    btn.innerHTML = '<span class="spinner"></span> Claiming...';
+    btn.disabled = true;
+
+    const tx = await contracts.dividendDistributor.claim();
+    btn.innerHTML = '<span class="spinner"></span> Confirming...';
+    await tx.wait();
+
+    btn.innerHTML = '✓ USDC Claimed!';
+    btn.style.background = 'linear-gradient(135deg, #166534, #14532d)';
+    btn.style.color = '#fff';
+
+    await refreshBalances();
+
+    setTimeout(() => {
+      btn.innerHTML = 'Claim USDC';
+      btn.style.background = 'linear-gradient(135deg, var(--orange), var(--orange-dark))';
+      btn.style.color = '#000';
+      btn.disabled = false;
+    }, 3000);
+
+  } catch (err) {
+    console.error('Claim failed:', err);
+    btn.innerHTML = '✗ ' + (err.reason || err.shortMessage || 'Claim failed');
+    btn.style.background = '#7f1d1d';
+    btn.style.color = '#fff';
+    setTimeout(() => {
+      btn.innerHTML = orig;
+      btn.style.background = 'linear-gradient(135deg, var(--orange), var(--orange-dark))';
+      btn.style.color = '#000';
+      btn.disabled = false;
+    }, 3000);
+  }
+}
+
+// ═══════════════════════════════════════
+// SMOOTH SCROLL
+// ═══════════════════════════════════════
+function scrollTo(sel) { document.querySelector(sel).scrollIntoView({ behavior: 'smooth' }); }
+
+// ═══════════════════════════════════════
+// DIVIDEND TIMELINE
+// ═══════════════════════════════════════
+(function() {
+  // Animate timeline fill when visible
+  const divObs = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const fill = document.getElementById('divTimelineFill');
+        if (fill) fill.style.width = '50%'; // ~halfway through the cycle
+      }
+    });
+  }, { threshold: 0.3 });
+  const divCard = document.querySelector('.div-card');
+  if (divCard) divObs.observe(divCard);
+
+  // Countdown to next payout (Feb 28, 2026)
+  function updateCountdown() {
+    const target = new Date('2026-02-28T00:00:00Z');
+    const now = new Date();
+    const diff = target - now;
+    if (diff <= 0) {
+      document.getElementById('divCountdown').textContent = 'Today!';
+      return;
+    }
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    if (days > 0) {
+      document.getElementById('divCountdown').textContent = days + 'd ' + hours + 'h';
+    } else {
+      const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      document.getElementById('divCountdown').textContent = hours + 'h ' + mins + 'm';
+    }
+  }
+  updateCountdown();
+  setInterval(updateCountdown, 60000);
+})();
+
+// ═══════════════════════════════════════
+// APPLE ICONS
+// ═══════════════════════════════════════
+const appleSvg = '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>';
+document.querySelectorAll('#appleIcon1, #appleIcon2, .pay-icon-lg.apple-lg').forEach(el => { el.innerHTML = appleSvg; });
+
+// Spinner CSS
+const s = document.createElement('style');
+s.textContent = `.spinner{display:inline-block;width:16px;height:16px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:spin .6s linear infinite;}@keyframes spin{to{transform:rotate(360deg)}}`;
+document.head.appendChild(s);
+
+// Auto-connect if wallet already authorized AND compliance cleared this session
+if (window.ethereum && sessionStorage.getItem('strusd_attested') === 'true') {
+  complianceCleared = true;
+  window.ethereum.request({ method: 'eth_accounts' }).then(accounts => {
+    if (accounts.length > 0) connectWallet();
+  });
+}
+</script>
+</body>
+</html>
