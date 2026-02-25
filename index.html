@@ -1180,12 +1180,12 @@ footer {
     </div>
 
     <h1 class="hero-fade hero-fade-2">
-      Earn <span class="orange glow-text" id="heroYield">~9.50%</span> Yield<br>
+      Earn <span class="orange glow-text" id="heroYield">~9.50%</span> Net Yield<br>
       <span class="dim">From STRC Dividends</span>
     </h1>
 
     <p class="hero-sub hero-fade hero-fade-3">
-      strUSD gives you on-chain STRC exposure — Strategy's preferred stock currently paying <span id="heroStrcRate">10.75%</span> dividends. Each strUSD = 1 STRC, priced live via Chainlink oracle.
+      strUSD gives you on-chain STRC exposure — Strategy's preferred stock currently paying <span id="heroStrcRate">11.25%</span> dividends. Each strUSD = 1 STRC, priced live via Chainlink oracle. Dividends paid in USDC.
     </p>
 
     <div class="hero-ctas hero-fade hero-fade-4">
@@ -1250,7 +1250,7 @@ footer {
           <div class="input-group">
             <div class="input-label">
               <span>You Pay</span>
-              <span class="bal" onclick="setMax()">Balance: 12,450.00</span>
+              <span class="bal" id="mintUsdcBal" onclick="setMax()" style="cursor:pointer;">Balance: —</span>
             </div>
             <div class="input-wrapper">
               <input type="text" placeholder="0.00" id="mintInput" oninput="updateOutput()">
@@ -1266,7 +1266,10 @@ footer {
           </div>
 
           <div class="input-group">
-            <div class="input-label"><span>You Receive</span></div>
+            <div class="input-label">
+              <span>You Receive</span>
+              <span class="bal" id="mintStrUsdVal" style="color:var(--text-muted);font-size:12px;"></span>
+            </div>
             <div class="input-wrapper">
               <input type="text" placeholder="0.00" id="mintOutput" readonly>
               <div class="token-badge">
@@ -1316,10 +1319,16 @@ footer {
         <!-- Redeem -->
         <div id="redeemForm" style="display:none;">
           <div class="input-group">
-            <div class="input-label"><span>You Return</span><span class="bal">Balance: 8,200.00</span></div>
+            <div class="input-label">
+              <span>You Return</span>
+              <span class="bal" id="redeemStrBal" onclick="setRedeemMax()" style="cursor:pointer;">Balance: —</span>
+            </div>
             <div class="input-wrapper">
               <input type="text" placeholder="0.00" id="redeemInput" oninput="updateRedeemOutput()">
               <div class="token-badge"><div class="token-dot strusd">s</div> strUSD</div>
+            </div>
+            <div style="text-align:right;margin-top:4px;">
+              <span id="redeemInputVal" style="font-size:12px;color:var(--text-muted);"></span>
             </div>
           </div>
           <div class="swap-arrow"><div class="swap-arrow-icon">↓</div></div>
@@ -1334,14 +1343,14 @@ footer {
           <div class="rate-info">
             <div class="rate-row"><span class="label">STRC Price</span><span class="value" id="redeemStrcPrice">$—</span></div>
             <div class="rate-row"><span class="label">Settlement</span><span class="value">T+1 (24 hours)</span></div>
-            <div class="rate-row"><span class="label">Redemption Fee</span><span class="value">0.10%</span></div>
+            <div class="rate-row"><span class="label">Redemption Fee</span><span class="value" id="redeemFeeDisplay">0.10%</span></div>
           </div>
         </div>
 
         <!-- Stake -->
         <div id="stakeForm" style="display:none;">
           <div class="input-group">
-            <div class="input-label"><span>Stake strUSD</span><span class="bal">Balance: 8,200.00</span></div>
+            <div class="input-label"><span>Stake strUSD</span><span class="bal" id="stakeStrBal">Balance: —</span></div>
             <div class="input-wrapper">
               <input type="text" placeholder="0.00">
               <div class="token-badge"><div class="token-dot strusd">s</div> strUSD</div>
@@ -1442,7 +1451,7 @@ footer {
         <div class="step-card reveal reveal-delay-3">
           <div class="step-num">3</div>
           <div class="step-title">Earn</div>
-          <div class="step-desc">STRC pays dividends monthly (rate set by Strategy — currently <span id="howStrcRate">10.75%</span>). After the protocol spread, net yield flows to holders. Redeem to USDC at current STRC price anytime.</div>
+          <div class="step-desc">STRC pays dividends monthly (rate set by Strategy — currently <span id="howStrcRate">11.25%</span>). After the protocol spread, net yield flows to holders in USDC. Redeem to USDC at current STRC price anytime.</div>
         </div>
       </div>
     </div>
@@ -1473,7 +1482,7 @@ footer {
             <div class="div-milestone-content">
               <div class="div-milestone-label">Last Payout</div>
               <div class="div-milestone-date">Jan 31</div>
-              <div class="div-milestone-detail">$0.92 / share</div>
+              <div class="div-milestone-detail">$0.9375 / strUSD (in USDC)</div>
             </div>
           </div>
 
@@ -1500,7 +1509,7 @@ footer {
             <div class="div-milestone-content">
               <div class="div-milestone-label">Next Payout</div>
               <div class="div-milestone-date">Feb 28</div>
-              <div class="div-milestone-detail">$0.94 / share</div>
+              <div class="div-milestone-detail">$0.9375 / strUSD (in USDC)</div>
             </div>
           </div>
         </div>
@@ -1518,7 +1527,7 @@ footer {
             <div class="div-info-icon">&#128176;</div>
             <div>
               <div class="div-info-title">You'll Earn</div>
-              <div class="div-info-value orange-text">~$41.67 <span class="div-per">per $5,000</span></div>
+              <div class="div-info-value orange-text">~$39.58 USDC <span class="div-per">per $5,000</span></div>
             </div>
           </div>
           <div class="div-info-item">
@@ -1662,7 +1671,7 @@ footer {
       <a href="#">Twitter</a>
       <a href="#">Discord</a>
     </div>
-    <div class="footer-copy">Not available to US persons. Not FDIC insured.</div>
+    <div class="footer-copy">Demo mode — test tokens only. Not FDIC insured. Dividends paid in USDC.</div>
   </div>
 </footer>
 
@@ -1970,7 +1979,7 @@ let signer = null;
 let userAddress = null;
 let contracts = {};
 let balances = { usdc: 0n, strUSD: 0n, sStrUSD: 0n };
-let cachedStrcPrice = 25; // fallback STRC price in USD
+let cachedStrcPrice = 100; // fallback STRC price in USD
 let faucetAmount = 1000; // default faucet amount in USDC
 
 // ═══════════════════════════════════════
@@ -2208,7 +2217,7 @@ setTimeout(() => {
   animateCounter(document.getElementById('animApy'), 9.50, '', '%', 2, 2000);
   animateCounter(document.getElementById('animTvl'), 0.0, '$', 'M', 1, 2000);
   animateCounter(document.getElementById('animHolders'), 0, '', '', 0, 2000);
-  animateCounter(document.getElementById('animStrcPrice'), 25.00, '$', '', 2, 2000);
+  animateCounter(document.getElementById('animStrcPrice'), 100.00, '$', '', 2, 2000);
 }, 800);
 
 // ═══════════════════════════════════════
@@ -2280,7 +2289,12 @@ function selectPayment(el, method) {
 // ═══════════════════════════════════════
 async function updateOutput() {
   const input = parseFloat(document.getElementById('mintInput').value) || 0;
-  if (input <= 0) { document.getElementById('mintOutput').value = ''; return; }
+  const valEl = document.getElementById('mintStrUsdVal');
+  if (input <= 0) {
+    document.getElementById('mintOutput').value = '';
+    if (valEl) valEl.textContent = '';
+    return;
+  }
 
   // If connected and using USDC, use the on-chain previewMint for accurate NAV pricing
   if (contracts.minter && selectedPay === 'usdc') {
@@ -2289,6 +2303,11 @@ async function updateOutput() {
       const strUSDOut = await contracts.minter.previewMint(usdcAmount);
       const formatted = parseFloat(ethers.formatUnits(strUSDOut, 18));
       document.getElementById('mintOutput').value = formatted > 0 ? formatted.toFixed(6) : '';
+      // Show dollar value: each strUSD = 1 STRC at current price
+      if (valEl && formatted > 0) {
+        const dollarVal = formatted * cachedStrcPrice;
+        valEl.textContent = '~$' + dollarVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' at $' + cachedStrcPrice.toFixed(2) + '/STRC';
+      }
       return;
     } catch (e) {
       console.warn('previewMint call failed, using fallback:', e);
@@ -2301,6 +2320,11 @@ async function updateOutput() {
   const price = cachedStrcPrice || 25;
   const strUSDEstimate = netUsdc / price;
   document.getElementById('mintOutput').value = strUSDEstimate > 0 ? strUSDEstimate.toFixed(6) : '';
+  // Show dollar context for fallback
+  if (valEl && strUSDEstimate > 0) {
+    const dollarVal = strUSDEstimate * price;
+    valEl.textContent = '~$' + dollarVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' at $' + price.toFixed(2) + '/STRC';
+  }
 }
 function setMax() {
   const bal = ethers.formatUnits(balances.usdc, 6);
@@ -2310,7 +2334,20 @@ function setMax() {
 
 async function updateRedeemOutput() {
   const input = parseFloat(document.getElementById('redeemInput').value) || 0;
-  if (input <= 0) { document.getElementById('redeemOutput').value = ''; return; }
+  const inputValEl = document.getElementById('redeemInputVal');
+  if (input <= 0) {
+    document.getElementById('redeemOutput').value = '';
+    if (inputValEl) inputValEl.textContent = '';
+    return;
+  }
+
+  const price = cachedStrcPrice || 25;
+
+  // Show dollar value of strUSD being redeemed
+  if (inputValEl && input > 0) {
+    const grossVal = input * price;
+    inputValEl.textContent = input.toFixed(2) + ' strUSD × $' + price.toFixed(2) + ' = ~$' + grossVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
 
   // If connected, use on-chain previewRedeem
   if (contracts.minter) {
@@ -2326,10 +2363,15 @@ async function updateRedeemOutput() {
   }
 
   // Fallback: estimate using cached STRC price minus fee
-  const price = cachedStrcPrice || 25;
   const grossUsdc = input * price;
   const netUsdc = grossUsdc * (1 - 0.001); // 0.10% redeem fee
   document.getElementById('redeemOutput').value = netUsdc > 0 ? netUsdc.toFixed(2) : '';
+}
+
+function setRedeemMax() {
+  const bal = ethers.formatUnits(balances.strUSD, 18);
+  document.getElementById('redeemInput').value = parseFloat(bal).toFixed(6);
+  updateRedeemOutput();
 }
 
 // ═══════════════════════════════════════
@@ -2449,8 +2491,20 @@ async function refreshProtocolData() {
 
       // Exchange rate: 1 strUSD = 1 STRC = $X USDC
       if (el('exchangeRateDisplay')) {
-        el('exchangeRateDisplay').textContent = strcPrice.toFixed(2) + ' USDC per strUSD';
+        el('exchangeRateDisplay').textContent = '1 strUSD = 1 STRC = $' + strcPrice.toFixed(2);
       }
+
+      // Fetch fees from contract
+      try {
+        const [mintFeeBps, redeemFeeBps] = await Promise.all([
+          contracts.minter.mintFeeBps(),
+          contracts.minter.redeemFeeBps(),
+        ]);
+        const mintFee = (Number(mintFeeBps) / 100).toFixed(2);
+        const redeemFee = (Number(redeemFeeBps) / 100).toFixed(2);
+        if (el('feeDisplay')) el('feeDisplay').textContent = mintFee + '%';
+        if (el('redeemFeeDisplay')) el('redeemFeeDisplay').textContent = redeemFee + '%';
+      } catch (e) { /* fees not available */ }
     }
 
     // Fetch dividend rate from YieldDistributor
@@ -2532,15 +2586,21 @@ async function refreshBalances() {
     const pendFmt = activeRedeemCount.toString();
     const claimFmt = fmtUsd(claimableUsdc, 6);
 
-    // Update form balance labels
-    document.querySelectorAll('.bal').forEach(el => {
-      const text = el.textContent;
-      if (text.includes('12,450') || text.includes('Balance:')) {
-        if (el.closest('#mintForm') || el.closest('.tab-content[data-tab="mint"]')) {
-          el.textContent = 'Balance: ' + usdcFmt;
-        }
-      }
-    });
+    // Update form balance labels with proper IDs
+    const elById = (id) => document.getElementById(id);
+
+    // Mint form: USDC balance
+    if (elById('mintUsdcBal')) elById('mintUsdcBal').textContent = 'Balance: ' + usdcFmt + ' USDC';
+
+    // Redeem form: strUSD balance + dollar value
+    if (elById('redeemStrBal')) {
+      const strFloat = parseFloat(ethers.formatUnits(strBal, 18));
+      const strDollarVal = strFloat * cachedStrcPrice;
+      elById('redeemStrBal').textContent = 'Balance: ' + strFmt + ' strUSD (~$' + strDollarVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ')';
+    }
+
+    // Stake form: strUSD balance
+    if (elById('stakeStrBal')) elById('stakeStrBal').textContent = 'Balance: ' + strFmt + ' strUSD';
 
     // Update dashboard by ID
     const el = (id) => document.getElementById(id);
