@@ -1091,8 +1091,8 @@ footer {
 <!-- ═══ Compliance Gate ═══ -->
 <div class="compliance-overlay" id="complianceOverlay">
   <div class="compliance-card">
-    <h2>Access Restricted</h2>
-    <div class="subtitle">strUSD is not available to US persons</div>
+    <h2>Compliance Attestation</h2>
+    <div class="subtitle">Please verify your eligibility to proceed</div>
 
     <div id="geoStatus" style="margin-bottom: 16px; font-size: 13px; color: var(--text-muted);">
       Checking your location...
@@ -1764,25 +1764,33 @@ const sessionAttested = sessionStorage.getItem('strusd_attested');
     const allBlocked = [...BLOCKED_COUNTRIES, ...SANCTIONED_COUNTRIES];
     if (allBlocked.includes(country)) {
       const isUS = BLOCKED_COUNTRIES.includes(country);
-      geoStatus.style.display = 'none';
-      geoBlocked.style.display = 'block';
+      const isSanctioned = SANCTIONED_COUNTRIES.includes(country);
 
-      if (!isUS) {
+      // Hard block sanctioned countries (OFAC)
+      if (isSanctioned) {
+        geoStatus.style.display = 'none';
+        geoBlocked.style.display = 'block';
         geoBlocked.textContent = 'This service is not available in your jurisdiction due to international sanctions regulations.';
+        console.warn('[COMPLIANCE] Blocked access (sanctioned):', { country, region, timestamp: new Date().toISOString() });
+        return;
       }
 
-      // Log blocked access attempt (for compliance records)
-      console.warn('[COMPLIANCE] Blocked access:', { country, region, timestamp: new Date().toISOString() });
-      return;
+      // Demo mode: US users can access with attestation for testing purposes
+      geoStatus.innerHTML = '⚠️ <strong style="color:var(--orange);">Demo Mode</strong> — This protocol uses test tokens only. No real financial transactions.';
+      geoStatus.style.color = 'var(--orange)';
+      complianceForm.style.display = 'block';
+
+      // Log demo access
+      console.log('[COMPLIANCE] Demo mode access:', { country, region, timestamp: new Date().toISOString() });
+    } else {
+      // Passed geo check — show attestation form
+      geoStatus.innerHTML = '✓ Location verified: <strong style="color:var(--orange);">' + country + '</strong>';
+      geoStatus.style.color = '#22c55e';
+      complianceForm.style.display = 'block';
+
+      // Log successful geo check
+      console.log('[COMPLIANCE] Geo check passed:', { country, region });
     }
-
-    // Passed geo check — show attestation form
-    geoStatus.innerHTML = '✓ Location verified: <strong style="color:var(--orange);">' + country + '</strong>';
-    geoStatus.style.color = '#22c55e';
-    complianceForm.style.display = 'block';
-
-    // Log successful geo check
-    console.log('[COMPLIANCE] Geo check passed:', { country, region });
 
   } catch (err) {
     // Network error — show attestation only
